@@ -1,0 +1,14 @@
+#!/bin/sh
+
+docker ps -qa --filter="name=howtowhale" | xargs docker rm -vf
+
+docker build -t carolynvs/howtowhale-user user/
+docker build -t carolynvs/howtowhale-hub hub/
+
+docker run --name howtowhale-hub \
+  -d -p 80:8000 -p 8081:8081 \
+  --volumes-from swarm-data:ro \
+  -e DOCKER_HOST=https://${DOCKER_HOST#tcp://} \
+  -e GITHUB_CLIENT_ID=${HOWTOWHALE_CLIENT_ID} \
+  -e GITHUB_CLIENT_SECRET=${HOWTOWHALE_CLIENT_SECRET} \
+  carolynvs/howtowhale-hub
