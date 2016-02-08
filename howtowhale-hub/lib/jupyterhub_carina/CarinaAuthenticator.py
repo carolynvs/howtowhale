@@ -48,15 +48,11 @@ class CarinaAuthenticator(Authenticator):
     @gen.coroutine
     def authenticate(self, handler, data):
         username = data['username']
+        apikey = data['apikey']
 
-        zf = zipfile.ZipFile(BytesIO(handler.request.files['zipfile'][0]['body']))
-
-        cluster_name = psplit(zf.namelist()[0])[0]
-        self.docker_env_dir = mkdtemp(suffix='-carinaauth')
-
-        for name in ('docker.env', 'cert.pem', 'ca.pem', 'ca-key.pem', 'key.pem'):
-            zf.extract(pjoin(cluster_name, name), path=self.docker_env_dir)
-
-        self.docker_env_dir = pjoin(self.docker_env_dir, cluster_name)
+        # use carina cli to create a cluster
+        # how to call this without leaking credentials?
+        # carina create --no-cache --wait --api-key --username howtowhale
+        # carina credentials --no-cache--path=/tmp/creds trydocker
 
         return username

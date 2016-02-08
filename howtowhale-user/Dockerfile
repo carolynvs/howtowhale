@@ -10,8 +10,8 @@ RUN pip install bash_kernel && \
 # Workaround bug in pexepct 4.0.1, can remove once they release a new version
 ADD https://raw.githubusercontent.com/pexpect/pexpect/master/pexpect/bashrc.sh /opt/conda/lib/python3.4/site-packages/pexpect/
 
-# Install docker client
-RUN wget -O /usr/local/bin/docker https://get.docker.com/builds/Linux/x86_64/docker-1.10.0 && \
+# Install Docker client
+RUN wget --quiet -O /usr/local/bin/docker https://get.docker.com/builds/Linux/x86_64/docker-1.10.0 && \
     chmod +x /usr/local/bin/docker
 
 # Run the notebook as a non-root user
