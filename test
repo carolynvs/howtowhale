@@ -2,8 +2,8 @@
 
 docker ps -qa --filter="name=howtowhale" | xargs docker rm -vf
 
-docker build -t carolynvs/howtowhale-user user/
-docker build -t carolynvs/howtowhale-hub hub/
+docker build -t carolynvs/howtowhale-user howtowhale-user/
+docker build -t carolynvs/howtowhale-hub howtowhale-hub/
 
 docker run --name howtowhale-hub \
   -d -p 80:8000 -p 8081:8081 \
