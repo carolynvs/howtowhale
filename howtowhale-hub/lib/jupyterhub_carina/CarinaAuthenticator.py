@@ -1,122 +1,62 @@
-"""
-Custom Authenticator to use GitHub OAuth with JupyterHub
+import zipfile
+from io import BytesIO
+from tempfile import mkdtemp
+from os.path import join as pjoin
+from os.path import split as psplit
 
-Most of the code c/o Kyle Kelley (@rgbkrk)
-"""
-
-
-import json
-import os
-
-from tornado.auth import OAuth2Mixin
 from tornado import gen, web
 
-from tornado.httputil import url_concat
-from tornado.httpclient import HTTPRequest, AsyncHTTPClient
-
-from jupyterhub.auth import LocalAuthenticator
-
-from traitlets import Unicode, Dict
-
-from oauthenticator import OAuthLoginHandler, OAuthenticator
-
-# Support github.com and github enterprise installations
-GITHUB_HOST = os.environ.get('GITHUB_HOST') or 'github.com'
-if GITHUB_HOST == 'github.com':
-    GITHUB_API = 'api.github.com/user'
-else:
-    GITHUB_API = '%s/api/v3/user' % GITHUB_HOST
-
-class GitHubMixin(OAuth2Mixin):
-    _OAUTH_AUTHORIZE_URL = "https://%s/login/oauth/authorize" % GITHUB_HOST
-    _OAUTH_ACCESS_TOKEN_URL = "https://%s/login/oauth/access_token" % GITHUB_HOST
+from jupyterhub.auth import Authenticator
 
 
-class GitHubLoginHandler(OAuthLoginHandler, GitHubMixin):
-    pass
+class CarinaAuthenticator(Authenticator):
+    custom_html = """
+    <form enctype="multipart/form-data" action="login" method="post">
 
+    <p class="help-block">Sign in with your <a href="https://getcarina.com">Carina</a> account.</p>
 
-class CarinaAuthenticator(OAuthenticator):
+    <label for="username_input">Carina User:</label>
+    <input
+      id="username_input"
+      type="username"
+      autocapitalize="off"
+      autocorrect="off"
+      class="form-control"
+      name="username"
+      tabindex="1"
+      autofocus="autofocus"
+    />
+    <label for='password_input'>Carina API Key:</label>
+    <input
+      type="password"
+      class="form-control"
+      name="apikey"
+      id="apikey_input"
+      tabindex="2"
+    />
 
-    login_service = "GitHub"
-
-    # deprecated names
-    github_client_id = Unicode(config=True, help="DEPRECATED")
-    def _github_client_id_changed(self, name, old, new):
-        self.log.warn("github_client_id is deprecated, use client_id")
-        self.client_id = new
-    github_client_secret = Unicode(config=True, help="DEPRECATED")
-    def _github_client_secret_changed(self, name, old, new):
-        self.log.warn("github_client_secret is deprecated, use client_secret")
-        self.client_secret = new
-
-    client_id_env = 'GITHUB_CLIENT_ID'
-    client_secret_env = 'GITHUB_CLIENT_SECRET'
-    login_handler = GitHubLoginHandler
-
-    username_map = Dict(config=True, default_value={},
-                        help="""Optional dict to remap github usernames to nix usernames.
-
-        User github usernames for keys and existing nix usernames as values.
-        cf https://github.com/jupyter/oauthenticator/issues/28
-        """)
+    <input
+      type="submit"
+      id="login_submit"
+      class='btn btn-jupyter'
+      value='Sign In'
+      tabindex="3"
+    />
+    </form>
+    """
 
     @gen.coroutine
-    def authenticate(self, handler):
-        code = handler.get_argument("code", False)
-        if not code:
-            raise web.HTTPError(400, "oauth callback made without a token")
-        # TODO: Configure the curl_httpclient for tornado
-        http_client = AsyncHTTPClient()
+    def authenticate(self, handler, data):
+        username = data['username']
 
-        # Exchange the OAuth code for a GitHub Access Token
-        #
-        # See: https://developer.github.com/v3/oauth/
+        zf = zipfile.ZipFile(BytesIO(handler.request.files['zipfile'][0]['body']))
 
-        # GitHub specifies a POST request yet requires URL parameters
-        params = dict(
-            client_id=self.client_id,
-            client_secret=self.client_secret,
-            code=code
-        )
+        cluster_name = psplit(zf.namelist()[0])[0]
+        self.docker_env_dir = mkdtemp(suffix='-carinaauth')
 
-        url = url_concat("https://%s/login/oauth/access_token" % GITHUB_HOST,
-                         params)
+        for name in ('docker.env', 'cert.pem', 'ca.pem', 'ca-key.pem', 'key.pem'):
+            zf.extract(pjoin(cluster_name, name), path=self.docker_env_dir)
 
-        req = HTTPRequest(url,
-                          method="POST",
-                          headers={"Accept": "application/json"},
-                          body='' # Body is required for a POST...
-                          )
+        self.docker_env_dir = pjoin(self.docker_env_dir, cluster_name)
 
-        resp = yield http_client.fetch(req)
-        resp_json = json.loads(resp.body.decode('utf8', 'replace'))
-
-        access_token = resp_json['access_token']
-
-        # Determine who the logged in user is
-        headers={"Accept": "application/json",
-                 "User-Agent": "JupyterHub",
-                 "Authorization": "token {}".format(access_token)
-        }
-        req = HTTPRequest("https://%s" % GITHUB_API,
-                          method="GET",
-                          headers=headers
-                          )
-        resp = yield http_client.fetch(req)
-        resp_json = json.loads(resp.body.decode('utf8', 'replace'))
-
-        github_username = resp_json["login"]
-        #remap gihub username to system username
-        nix_username = self.username_map.get(github_username, github_username)
-
-        #check system username against whitelist
-        if self.whitelist and nix_username not in self.whitelist:
-            nix_username = None
-        return nix_username
-
-
-class LocalCarinaAuthenticator(LocalAuthenticator, CarinaAuthenticator):
-
-    """A version that mixes in local system user creation"""
-    pass
+        return username
