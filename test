@@ -4,11 +4,19 @@ docker ps -qa --filter="name=howtowhale" | xargs docker rm -vf
 
 docker build -t carolynvs/howtowhale-user howtowhale-user/
 docker build -t carolynvs/howtowhale-hub howtowhale-hub/
+# use --build-arg affinity:container==letsencrypt-data  if we grow the cluster
+docker build -t carolynvs/howtowhale-proxy howtowhale-proxy/
 
 docker run --name howtowhale-hub \
-  -d -p 80:8000 -p 8081:8081 \
+  -d -p 8081:8081 \
   --volumes-from swarm-data:ro \
   -e DOCKER_HOST=https://${DOCKER_HOST#tcp://} \
   -e GITHUB_CLIENT_ID=${HOWTOWHALE_CLIENT_ID} \
   -e GITHUB_CLIENT_SECRET=${HOWTOWHALE_CLIENT_SECRET} \
   carolynvs/howtowhale-hub
+
+docker run --name howtowhale-proxy \
+  -d -p 443:443 \
+  --link howtowhale-hub:howtowhale-hub \
+  --volumes-from letsencrypt-data \
+  carolynvs/howtowhale-proxy
