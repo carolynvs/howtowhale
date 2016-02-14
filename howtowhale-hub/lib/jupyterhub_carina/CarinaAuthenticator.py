@@ -1,13 +1,7 @@
-import zipfile
-from io import BytesIO
-from tempfile import mkdtemp
-from os.path import join as pjoin
-from os.path import split as psplit
-
+import os
 from tornado import gen, web
-
 from jupyterhub.auth import Authenticator
-
+import logging
 
 class CarinaAuthenticator(Authenticator):
     custom_html = """
@@ -45,14 +39,32 @@ class CarinaAuthenticator(Authenticator):
     </form>
     """
 
+    def create_user_cluster(self, username, apikey):
+        from subprocess import call
+
+        userenv = os.environ.copy()
+        userenv["CARINA_USERNAME"]=username
+        userenv["CARINA_APIKEY"]=apikey
+        call(["carina", "create", "--wait", "howtowhale"], env=userenv)
+
     @gen.coroutine
     def authenticate(self, handler, data):
         username = data['username']
         apikey = data['apikey']
 
-        # use carina cli to create a cluster
-        # how to call this without leaking credentials?
-        # carina create --no-cache --wait --api-key --username howtowhale
-        # carina credentials --no-cache--path=/tmp/creds trydocker
+        if(self.authenticate_to_carina(username, apikey)):
+            return username
 
-        return username
+        return None
+
+    def authenticate_to_carina(self, username, apikey):
+        return self.list_clusters(username, apikey) == 0
+
+    def list_clusters(self, username, apikey):
+        from subprocess import call
+
+        userenv = os.environ.copy()
+        userenv["CARINA_USERNAME"]=username
+        userenv["CARINA_APIKEY"]=apikey
+
+        return call(["carina", "ls"], env=userenv)
