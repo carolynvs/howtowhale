@@ -6,11 +6,18 @@ from tornado import gen
 import os.path
 import docker
 from docker.errors import APIError
-
+import pprint
 from dockerspawner import DockerSpawner
 
 
 class CarinaSpawner(DockerSpawner):
+
+    def __init__(self, **kwargs):
+        super(CarinaSpawner, self).__init__(**kwargs)
+
+        self.starting = False
+        self.started = False
+
     @property
     def client(self):
         carina_dir = self.get_user_credentials_dir()
@@ -24,7 +31,8 @@ class CarinaSpawner(DockerSpawner):
             env = f.read()
         docker_host = re.findall("DOCKER_HOST=tcp://(\d+\.\d+\.\d+\.\d+:\d+)", env)[0]
         docker_host = 'https://' + docker_host
-        client = docker.Client(version='auto', tls=tls_config, base_url=docker_host)
+        client = docker.Client(version='auto', tls=tls_config, base_url=docker_host, timeout=300)
+
         return client
 
     @gen.coroutine
@@ -50,17 +58,63 @@ class CarinaSpawner(DockerSpawner):
 
     @gen.coroutine
     def start(self, image=None):
-        yield super(CarinaSpawner, self).start(
-            image=image,
-            extra_host_config={'port_bindings': {8888: None}},
+        try:
+            self.starting = True
+            self.log.warn("starting notebook for {}...".format(self.user.name))
+
+            self.log.warn("pulling image...")
+            pull_kwargs = dict(repository="carolynvs/howtowhale-user")
+            yield self.docker("pull", **pull_kwargs)
+            self.log.warn("image pulled!")
+
+            self.log.warn('starting user container...')
+            yield super(CarinaSpawner, self).start(
+                image=image,
+                extra_host_config={'port_bindings': {8888: None}},
+            )
+
+            container = yield self.get_container()
+            if container is not None:
+                node_name = container['Node']['IP']
+                self.user.server.ip = node_name
+                self.log.info("{} was started on {} ({}:{})".format(
+                self.container_name, node_name, self.user.server.ip, self.user.server.port))
+
+            self.started = True
+            self.starting = False
+            self.log.warn('startup complete!')
+        except Exception as e:
+            self.log.error('startup failed')
+            self.log.exception(e)
+
+    @gen.coroutine
+    def poll(self):
+        self.log.warn('polling...')
+        if self.starting and not self.started:
+            self.log.warn("startup is still in-progress!")
+            return None
+
+        """Check for my id in `docker ps`"""
+        container = yield self.get_container()
+        if not container:
+            self.log.warn("container not found")
+            return ""
+
+        container_state = container['State']
+        self.log.debug(
+            "Container %s status: %s",
+            self.container_id[:7],
+            pprint.pformat(container_state),
         )
 
-        container = yield self.get_container()
-        if container is not None:
-            node_name = container['Node']['IP']
-            self.user.server.ip = node_name
-            self.log.info("{} was started on {} ({}:{})".format(
-            self.container_name, node_name, self.user.server.ip, self.user.server.port))
+        if container_state["Running"]:
+            return None
+        else:
+            return (
+                "ExitCode={ExitCode}, "
+                "Error='{Error}', "
+                "FinishedAt={FinishedAt}".format(**container_state)
+            )
 
     def get_user_credentials_dir(self):
         credentials_dir = "/root/.carina/clusters/{}/howtowhale".format(self.user.name)
@@ -72,3 +126,26 @@ class CarinaSpawner(DockerSpawner):
             raise RuntimeError("Unable to find docker.env")
 
         return credentials_dir
+
+    def pull_image(self):
+        self.log.warn("pulling image...")
+
+        output = yield self.docker("pull", "carolynvs/howtowhale-user")
+        for line in output:
+            self.log.warn(json.dumps(json.loads(line), indent=4))
+
+        self.log.warn("image pulled!")
+
+    def is_image_pulled(self):
+        self.log.warn("Checking if the image has been pulled...")
+
+        images_kwargs = dict(name="carolynvs/howtowhale-user", quiet=True)
+        images = yield self.docker('images', **images_kwargs)
+        self.log.warn("got images")
+        self.log.warn(images)
+        if len(images) == 0:
+            self.log.warn("image is not yet pulled")
+            return False
+
+        return True
+        self.log.warn("found image!")
