@@ -8,19 +8,15 @@ docker build -t carolynvs/howtowhale-hub howtowhale-hub/
 # use --build-arg affinity:container==letsencrypt-data  if we grow the cluster
 docker build -t carolynvs/howtowhale-proxy howtowhale-proxy/
 
-SERVICENET_IP=$(docker run --rm --net=host racknet/ip service ipv4)
-
 docker run --name howtowhale-hub \
-  -d --net=host -p $SERVICENET_IP:8081:8081 \
+  -d -p 8081:8081 \
   --volumes-from swarm-data:ro \
   -e DOCKER_HOST=https://${DOCKER_HOST#tcp://} \
-  -e SERVICENET_IP=$SERVICENET_IP \
   carolynvs/howtowhale-hub
 
 #HUB_INTERNAL_IP=$(docker inspect -f '{{ .NetworkSettings.IPAddress }}' howtowhale-hub)
 
 docker run --name howtowhale-proxy \
-  -d --net=host -p 443:443 \
+  -d --link howtowhale-hub:howtowhale-hub -p 443:443 \
   --volumes-from letsencrypt-data \
-  -e HUB_INTERNAL_IP=$SERVICENET_IP \
   carolynvs/howtowhale-proxy
