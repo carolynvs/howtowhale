@@ -1,7 +1,8 @@
 import os
+import subprocess
+import tempfile
 from tornado import gen, web
 from jupyterhub.auth import Authenticator
-import logging
 
 class CarinaAuthenticator(Authenticator):
     custom_html = """
@@ -39,23 +40,20 @@ class CarinaAuthenticator(Authenticator):
     </form>
     """
 
-    def create_user_cluster(self, username, apikey):
-        from subprocess import call
-
-        userenv = os.environ.copy()
-        userenv["CARINA_USERNAME"]=username
-        userenv["CARINA_APIKEY"]=apikey
-        call(["carina", "create", "--wait", "howtowhale"], env=userenv)
-
     @gen.coroutine
     def authenticate(self, handler, data):
         username = data['username']
         apikey = data['apikey']
 
-        if(self.authenticate_to_carina(username, apikey)):
-            return username
+        if(not self.authenticate_to_carina(username, apikey)):
+            return None
 
-        return None
+        if(not self.user_cluster_exists(username, apikey)):
+            self.create_user_cluster(username, apikey)
+
+        self.download_user_cluster_credentials(username, apikey)
+
+        return username
 
     def authenticate_to_carina(self, username, apikey):
         return self.list_clusters(username, apikey) == 0
@@ -67,4 +65,35 @@ class CarinaAuthenticator(Authenticator):
         userenv["CARINA_USERNAME"]=username
         userenv["CARINA_APIKEY"]=apikey
 
-        return call(["carina", "ls"], env=userenv)
+        return subprocess.call(["carina", "ls", "--no-cache"], env=userenv)
+
+    def user_cluster_exists(self, username, apikey):
+        from subprocess import call
+
+        userenv = os.environ.copy()
+        userenv["CARINA_USERNAME"]=username
+        userenv["CARINA_APIKEY"]=apikey
+
+        return subprocess.call(["carina", "get", "--no-cache", "howtowhale"], env=userenv) == 0
+
+    def create_user_cluster(self, username, apikey):
+        from subprocess import call
+
+        userenv = os.environ.copy()
+        userenv["CARINA_USERNAME"]=username
+        userenv["CARINA_APIKEY"]=apikey
+
+        result = subprocess.call(["carina", "create", "--no-cache", "--wait", "howtowhale"], env=userenv)
+        if(result != 0):
+            raise RuntimeError("Unable to create a cluster for the user: {}".format(username))
+
+    def download_user_cluster_credentials(self, username, apikey):
+        from subprocess import call
+
+        userenv = os.environ.copy()
+        userenv["CARINA_USERNAME"]=username
+        userenv["CARINA_APIKEY"]=apikey
+
+        result = subprocess.call(["carina", "credentials", "--no-cache", "howtowhale"], env=userenv)
+        if(result != 0):
+            raise RuntimeError("Unable to download the credentials for the user: {}".format(username))

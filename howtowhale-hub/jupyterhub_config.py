@@ -4,7 +4,7 @@ c = get_config()
 
 # Run notebooks in separate container
 c.JupyterHub.hub_ip = "0.0.0.0"
-c.JupyterHub.spawner_class = "dockerspawner.DockerSpawner"
+c.JupyterHub.spawner_class = "jupyterhub_carina.CarinaSpawner"
 c.DockerSpawner.tls_verify = True
 c.DockerSpawner.tls_ca = "/etc/docker/ca.pem"
 c.DockerSpawner.tls_cert = "/etc/docker/server-cert.pem"
