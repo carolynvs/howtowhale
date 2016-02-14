@@ -17,6 +17,6 @@ docker run --name howtowhale-hub \
 #HUB_INTERNAL_IP=$(docker inspect -f '{{ .NetworkSettings.IPAddress }}' howtowhale-hub)
 
 docker run --name howtowhale-proxy \
-  -d --link howtowhale-hub:howtowhale-hub -p 443:443 \
+  -d --link howtowhale-hub:howtowhale-hub -p 80:80 -p 443:443 \
   --volumes-from letsencrypt-data \
   carolynvs/howtowhale-proxy
