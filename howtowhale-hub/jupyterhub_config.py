@@ -10,7 +10,7 @@ c.DockerSpawner.tls_ca = "/etc/docker/ca.pem"
 c.DockerSpawner.tls_cert = "/etc/docker/server-cert.pem"
 c.DockerSpawner.tls_key = "/etc/docker/server-key.pem"
 c.DockerSpawner.use_internal_ip = True
-c.DockerSpawner.hub_ip_connect = "howtowhale.com"
+c.DockerSpawner.hub_ip_connect = os.environ["SERVICENET_IP"]
 c.DockerSpawner.container_prefix = "howtowhale"
 c.DockerSpawner.container_image = "carolynvs/howtowhale-user"
 
