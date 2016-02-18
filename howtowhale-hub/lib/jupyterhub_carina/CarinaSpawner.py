@@ -8,7 +8,8 @@ import docker
 from docker.errors import APIError
 import pprint
 from dockerspawner import DockerSpawner
-
+from io import BytesIO
+import tarfile
 
 class CarinaSpawner(DockerSpawner):
 
@@ -80,6 +81,8 @@ class CarinaSpawner(DockerSpawner):
                 self.log.info("{} was started on {} ({}:{})".format(
                 self.container_name, node_name, self.user.server.ip, self.user.server.port))
 
+            yield self.move_user_credentials()
+
             self.started = True
             self.starting = False
             self.log.warn('startup complete!')
@@ -149,3 +152,26 @@ class CarinaSpawner(DockerSpawner):
 
         return True
         self.log.warn("found image!")
+
+    @gen.coroutine
+    def move_user_credentials(self):
+        self.log.warn("Moving user credentials from the hub to the user's notebook container...")
+
+        credentials_src = "/root/.carina/clusters/{}".format(self.user.name)
+        credentials_archive = BytesIO()
+        tar = tarfile.open(mode = "w", fileobj = credentials_archive)
+        #tar = tarfile.open(credentials_src + "/creds.tar", mode='w')
+        tar.add(credentials_src, arcname=".carina/clusters/{}".format(self.user.name))
+        tar.close()
+        credentials_archive.seek(0)
+
+        credentials_dest = "/home/jovyan"
+        success = yield self.docker("put_archive", self.container_id, credentials_dest, credentials_archive)
+        if not success:
+            raise RuntimeError("Unable to move Carina credentials from the hub to the user container!")
+
+        self.log.warn("Fixing the user/owner of the credentials")
+        result = yield self.docker("exec_create", self.container_id, "chown -R jovyan.users /home/jovyan/.carina")
+        self.log.warn(result)
+        result = yield self.docker("exec_start", result["Id"])
+        self.log.warn(result)
