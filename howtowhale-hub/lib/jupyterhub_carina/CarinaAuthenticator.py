@@ -45,6 +45,10 @@ class CarinaAuthenticator(Authenticator):
         username = data['username']
         apikey = data['apikey']
 
+        if not self.check_whitelist(username):
+            self.log.warning("User %r not in whitelist.", username)
+            return None
+
         if(not self.authenticate_to_carina(username, apikey)):
             return None
 
