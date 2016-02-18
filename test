@@ -4,6 +4,7 @@
 docker ps -qa --filter="name=howtowhale" | xargs docker rm -vf
 
 docker build -t carolynvs/howtowhale-user howtowhale-user/
+docker push carolynvs/howtowhale-user
 docker build -t carolynvs/howtowhale-hub howtowhale-hub/
 # use --build-arg affinity:container==letsencrypt-data  if we grow the cluster
 docker build -t carolynvs/howtowhale-proxy howtowhale-proxy/
