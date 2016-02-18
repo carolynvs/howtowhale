@@ -14,5 +14,5 @@ ADD https://raw.githubusercontent.com/pexpect/pexpect/master/pexpect/bashrc.sh /
 RUN wget --quiet -O /usr/local/bin/docker https://get.docker.com/builds/Linux/x86_64/docker-1.10.0 && \
     chmod +x /usr/local/bin/docker
 
-# Run the notebook as a non-root user
-USER jovyan
+#Workaround for https://github.com/getcarina/feedback/issues/31#issuecomment-185523037
+#USER jovyan
