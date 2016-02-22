@@ -16,3 +16,5 @@ RUN wget --quiet -O /usr/local/bin/docker https://get.docker.com/builds/Linux/x8
 
 #Workaround for https://github.com/getcarina/feedback/issues/31#issuecomment-185523037
 #USER jovyan
+
+ADD TryDocker.ipynb /home/jovyan/work/
