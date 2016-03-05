@@ -18,7 +18,7 @@ docker run \
   --publish 443:443 \
   --publish 80:80 \
   quay.io/letsencrypt/letsencrypt certonly \
-  --server https://acme-staging.api.letsencrypt.org/directory \
+  --server https://acme-v01.api.letsencrypt.org/directory \
   --domain howtowhale.com \
   --authenticator standalone \
   --email me@carolynvanslyck.com \
