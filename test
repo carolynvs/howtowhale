@@ -12,6 +12,7 @@ docker build -t carolynvs/howtowhale-proxy howtowhale-proxy/
 docker run --name howtowhale-hub \
   -d -p 8081:8081 \
   --volumes-from swarm-data:ro \
+  -e CARINA_OAUTH_HOST=https://carina-oauth.carolynvs.com \
   -e DOCKER_HOST=https://${DOCKER_HOST#tcp://} \
   carolynvs/howtowhale-hub
 
