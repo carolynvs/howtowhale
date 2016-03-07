@@ -1,103 +1,96 @@
+import json
+from jupyterhub.auth import Authenticator
 import os
 import subprocess
 import tempfile
+from tornado.auth import OAuth2Mixin
 from tornado import gen, web
-from jupyterhub.auth import Authenticator
+from tornado.httpclient import HTTPRequest, AsyncHTTPClient
+from traitlets import Unicode, Dict
+from traitlets.config import LoggingConfigurable
+import urllib
+from .oauth2 import OAuthLoginHandler, OAuthenticator
+from pprint import pformat
 
-class CarinaAuthenticator(Authenticator):
-    custom_html = """
-    <form enctype="multipart/form-data" action="login" method="post">
 
-    <p class="help-block">Sign in with your <a href="https://getcarina.com">Carina</a> account.</p>
+CARINA_OAUTH_HOST = os.environ.get('CARINA_OAUTH_HOST') or 'oauth.getcarina.com'
+CARINA_OAUTH_ACCESS_TOKEN_URL = "https://%s/oauth/token" % CARINA_OAUTH_HOST
+CARINA_OAUTH_IDENTITY_URL = "https://%s/me" % CARINA_OAUTH_HOST
 
-    <label for="username_input">Carina User:</label>
-    <input
-      id="username_input"
-      type="username"
-      autocapitalize="off"
-      autocorrect="off"
-      class="form-control"
-      name="username"
-      tabindex="1"
-      autofocus="autofocus"
-    />
-    <label for='password_input'>Carina API Key:</label>
-    <input
-      type="password"
-      class="form-control"
-      name="apikey"
-      id="apikey_input"
-      tabindex="2"
-    />
 
-    <input
-      type="submit"
-      id="login_submit"
-      class='btn btn-jupyter'
-      value='Sign In'
-      tabindex="3"
-    />
-    </form>
-    """
+class CarinaMixin(OAuth2Mixin):
+    _OAUTH_AUTHORIZE_URL = "https://%s/oauth/authorize" % CARINA_OAUTH_HOST
+    _OAUTH_ACCESS_TOKEN_URL = CARINA_OAUTH_ACCESS_TOKEN_URL
+
+class CarinaLoginHandler(OAuthLoginHandler, CarinaMixin):
+    scope = ['identity', 'cluster_credentials', 'create_cluster']
+
+class CarinaAuthenticator(OAuthenticator, LoggingConfigurable):
+
+    login_service = "Carina"
+    client_id_env = 'CARINA_CLIENT_ID'
+    client_secret_env = 'CARINA_CLIENT_SECRET'
+    login_handler = CarinaLoginHandler
+
+    username_map = Dict(config=True, default_value={},
+                        help="""Optional dict to remap github usernames to nix usernames.
+
+        User github usernames for keys and existing nix usernames as values.
+        cf https://github.com/jupyter/oauthenticator/issues/28
+        """)
 
     @gen.coroutine
-    def authenticate(self, handler, data):
-        username = data['username']
-        apikey = data['apikey']
+    def authenticate(self, handler):
+        code = handler.get_argument("code", False)
+        if not code:
+            raise web.HTTPError(400, "oauth callback made without a token")
 
-        if not self.check_whitelist(username):
-            self.log.warning("User %r not in whitelist.", username)
-            return None
+        http_client = AsyncHTTPClient()
 
-        if(not self.authenticate_to_carina(username, apikey)):
-            return None
+        # Exchange the OAuth code for a Carina Access Token
+        #
+        # See: https://github.com/doorkeeper-gem/doorkeeper/wiki/API-endpoint-descriptions-and-examples#post---oauthtoken
+        post_data = {
+            'code': code,
+            'redirect_uri': self.oauth_callback_url,
+            'grant_type': "authorization_code"
+        }
+        req = HTTPRequest(url=CARINA_OAUTH_ACCESS_TOKEN_URL,
+                          method="POST",
+                          body=urllib.parse.urlencode(post_data),
+                          headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
+                          auth_username=self.client_id,
+                          auth_password=self.client_secret,
+                          auth_mode="basic"
+                          )
 
-        if(not self.user_cluster_exists(username, apikey)):
-            self.create_user_cluster(username, apikey)
+        resp = None
+        try:
+            resp = yield http_client.fetch(req)
+        except Exception as ex:
+            self.log.error(ex.response.body)
+            self.log.exception(ex)
+        resp_json = json.loads(resp.body.decode('utf8', 'replace'))
 
-        self.download_user_cluster_credentials(username, apikey)
+        access_token = resp_json['access_token']
 
-        return username
+        # Determine who the logged in user is
+        headers={"Accept": "application/json",
+                 "User-Agent": "JupyterHub",
+                 "Authorization": "Bearer {}".format(access_token)
+        }
+        req = HTTPRequest(url=CARINA_OAUTH_IDENTITY_URL,
+                          method="GET",
+                          headers=headers
+                          )
+        resp = yield http_client.fetch(req)
+        resp_json = json.loads(resp.body.decode('utf8', 'replace'))
 
-    def authenticate_to_carina(self, username, apikey):
-        return self.list_clusters(username, apikey) == 0
+        carina_username = resp_json["username"]
+        #remap gihub username to system username
+        nix_username = self.username_map.get(carina_username, carina_username)
 
-    def list_clusters(self, username, apikey):
-        from subprocess import call
-
-        userenv = os.environ.copy()
-        userenv["CARINA_USERNAME"]=username
-        userenv["CARINA_APIKEY"]=apikey
-
-        return subprocess.call(["carina", "ls", "--no-cache"], env=userenv)
-
-    def user_cluster_exists(self, username, apikey):
-        from subprocess import call
-
-        userenv = os.environ.copy()
-        userenv["CARINA_USERNAME"]=username
-        userenv["CARINA_APIKEY"]=apikey
-
-        return subprocess.call(["carina", "get", "--no-cache", "howtowhale"], env=userenv) == 0
-
-    def create_user_cluster(self, username, apikey):
-        from subprocess import call
-
-        userenv = os.environ.copy()
-        userenv["CARINA_USERNAME"]=username
-        userenv["CARINA_APIKEY"]=apikey
-
-        result = subprocess.call(["carina", "create", "--no-cache", "--wait", "howtowhale"], env=userenv)
-        if(result != 0):
-            raise RuntimeError("Unable to create a cluster for the user: {}".format(username))
-
-    def download_user_cluster_credentials(self, username, apikey):
-        from subprocess import call
-
-        userenv = os.environ.copy()
-        userenv["CARINA_USERNAME"]=username
-        userenv["CARINA_APIKEY"]=apikey
-
-        result = subprocess.call(["carina", "credentials", "--no-cache", "howtowhale"], env=userenv)
-        if(result != 0):
-            raise RuntimeError("Unable to download the credentials for the user: {}".format(username))
+        #check system username against whitelist
+        if self.whitelist and nix_username not in self.whitelist:
+            nix_username = None
+        return nix_username
