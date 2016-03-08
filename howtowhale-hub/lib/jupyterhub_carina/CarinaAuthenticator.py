@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from tornado.auth import OAuth2Mixin
 from tornado import gen, web
-from tornado.httpclient import HTTPRequest, AsyncHTTPClient
+from tornado.httpclient import HTTPRequest, HTTPError, AsyncHTTPClient
 from traitlets import Unicode, Dict
 from traitlets.config import LoggingConfigurable
 import urllib
@@ -67,17 +67,19 @@ class CarinaAuthenticator(OAuthenticator, LoggingConfigurable):
         resp = None
         try:
             resp = yield http_client.fetch(req)
-        except Exception as ex:
+        except HTTPError as ex:
             self.log.error(ex.response.body)
             self.log.exception(ex)
+            raise
+
         resp_json = json.loads(resp.body.decode('utf8', 'replace'))
 
-        access_token = resp_json['access_token']
+        self.oauth_token = resp_json['access_token']
 
         # Determine who the logged in user is
         headers={"Accept": "application/json",
                  "User-Agent": "JupyterHub",
-                 "Authorization": "Bearer {}".format(access_token)
+                 "Authorization": "Bearer {}".format(self.oauth_token)
         }
         req = HTTPRequest(url=CARINA_OAUTH_IDENTITY_URL,
                           method="GET",
