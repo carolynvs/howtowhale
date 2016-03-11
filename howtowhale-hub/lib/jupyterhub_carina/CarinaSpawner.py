@@ -18,6 +18,7 @@ CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
 class CarinaSpawner(DockerSpawner):
 
     cluster_name = "jupyterhub"
+    volumes = { '/var/run/docker.sock': '/var/run/docker.sock' }
 
     def __init__(self, **kwargs):
         super(CarinaSpawner, self).__init__(**kwargs)
@@ -151,6 +152,7 @@ class CarinaSpawner(DockerSpawner):
         except HTTPError as ex:
             self.log.error(ex.response.body)
             self.log.exception(ex)
+            raise
 
     @gen.coroutine
     def download_cluster_credentials(self):

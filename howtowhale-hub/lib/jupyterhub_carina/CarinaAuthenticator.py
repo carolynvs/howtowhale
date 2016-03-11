@@ -85,7 +85,12 @@ class CarinaAuthenticator(OAuthenticator, LoggingConfigurable):
                           method="GET",
                           headers=headers
                           )
-        resp = yield http_client.fetch(req)
+        try:
+            resp = yield http_client.fetch(req)
+        except HTTPError as ex:
+            self.log.error(ex.response.body)
+            self.log.exception(ex)
+            raise
         resp_json = json.loads(resp.body.decode('utf8', 'replace'))
 
         carina_username = resp_json["username"]
