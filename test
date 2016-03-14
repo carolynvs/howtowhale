@@ -1,6 +1,7 @@
 #!/bin/sh
+set -e
 
-
+eval $(carina env howtowhale-com)
 docker ps -qa --filter="name=howtowhale" | xargs docker rm -vf
 
 docker build -t carolynvs/howtowhale-user howtowhale-user/
@@ -24,3 +25,7 @@ docker run --name howtowhale-proxy \
   -d --link howtowhale-hub:howtowhale-hub -p 80:80 -p 443:443 \
   --volumes-from letsencrypt-data \
   carolynvs/howtowhale-proxy
+
+eval $(carina env jupyterhub)
+docker ps -qa --filter="name=howtowhale-carolynvs" | xargs docker rm -vf
+docker ps -qa --filter="name=jupyterhub" | xargs docker rm -vf
