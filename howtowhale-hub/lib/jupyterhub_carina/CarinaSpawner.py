@@ -17,7 +17,7 @@ CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
 
 class CarinaSpawner(DockerSpawner):
 
-    cluster_name = "jupyterhub"
+    cluster_name = "howtowhale"
     volumes = { '/var/run/docker.sock': '/var/run/docker.sock' }
 
     @property

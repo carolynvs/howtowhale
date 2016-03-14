@@ -26,6 +26,5 @@ docker run --name howtowhale-proxy \
   --volumes-from letsencrypt-data \
   carolynvs/howtowhale-proxy
 
-eval $(carina env jupyterhub)
+eval $(carina env howtowhale)
 docker ps -qa --filter="name=howtowhale-carolynvs" | xargs docker rm -vf
-docker ps -qa --filter="name=jupyterhub" | xargs docker rm -vf
