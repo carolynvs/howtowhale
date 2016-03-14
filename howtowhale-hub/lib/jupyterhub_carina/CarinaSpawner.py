@@ -20,12 +20,6 @@ class CarinaSpawner(DockerSpawner):
     cluster_name = "jupyterhub"
     volumes = { '/var/run/docker.sock': '/var/run/docker.sock' }
 
-    def __init__(self, **kwargs):
-        super(CarinaSpawner, self).__init__(**kwargs)
-
-        self.starting = False
-        self.started = False
-
     @property
     def client(self):
         carina_dir = self.get_user_credentials_dir()
@@ -67,7 +61,6 @@ class CarinaSpawner(DockerSpawner):
     @gen.coroutine
     def start(self, image=None):
         try:
-            self.starting = True
             self.log.warn("starting notebook for {}...".format(self.user.name))
 
             yield self.create_cluster()
@@ -91,8 +84,6 @@ class CarinaSpawner(DockerSpawner):
                 self.log.info("{} was started on {} ({}:{})".format(
                     self.container_name, node_name, self.user.server.ip, self.user.server.port))
 
-            self.started = True
-            self.starting = False
             self.log.warn('startup complete!')
         except Exception as e:
             self.log.error('startup failed')
@@ -102,9 +93,6 @@ class CarinaSpawner(DockerSpawner):
     @gen.coroutine
     def poll(self):
         self.log.warn('polling...')
-        if self.starting and not self.started:
-            self.log.warn("startup is still in-progress!")
-            return None
 
         """Check for my id in `docker ps`"""
         container = yield self.get_container()
