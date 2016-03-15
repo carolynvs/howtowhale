@@ -162,47 +162,39 @@ class CarinaSpawner(DockerSpawner):
 
         self.log.info("Downloading {} cluster credentials for {}...".format(self.cluster_name, self.user.name))
 
-        def handle_request(response):
-            nonlocal done
-
-            if not response.error:
-                done = True
-                self.log.debug("Credentials received")
-                return response.body
-
-            if response.error.code == 404 and "cluster is not yet active" in response.body:
-                # don't worry keep trying!
-                self.log.debug("The {}/{} cluster is not yet active, retrying...".format(self.user.name, self.cluster_name))
-                yield gen.sleep(30)
-                return None
-            else:
-                # abort, something bad happened!
-                self.log.error(response.response.body)
-                self.log.exception(response.error)
-                response.rethrow
-
         http_client = AsyncHTTPClient()
-        headers={"Accept": "application/json",
-                 "User-Agent": "JupyterHub",
-                 "Authorization": "Bearer {}".format(self.authenticator.oauth_token)}
-        req = HTTPRequest(url=os.path.join(CARINA_CLUSTERS_URL, self.cluster_name),
+        request = HTTPRequest(url=os.path.join(CARINA_CLUSTERS_URL, self.cluster_name),
                           method="GET",
-                          headers=headers)
+                          headers={"Accept": "application/json",
+                                   "User-Agent": "JupyterHub",
+                                   "Authorization": "Bearer {}".format(self.authenticator.oauth_token)})
 
-        done = False
-        #while not done:
-        resp = yield http_client.fetch(req, callback=handle_request, raise_error=False)
+        while True:
+            # TODO: Abort after some set timeout, does jupyterhub handle that for us?
+            response = yield http_client.fetch(request, raise_error=False)
 
-        credentials_zip = ZipFile(resp.buffer, "r")
+            if response.error is None:
+                self.log.info("Credentials received")
+                break
+
+            if response.code == 404:
+                if "cluster is not yet active" in response.body.decode(encoding='UTF-8'):
+                    self.log.info("The {}/{} cluster is not yet active, retrying in 30s...".format(self.user.name, self.cluster_name))
+                    yield gen.sleep(30)
+                    continue
+
+            # abort, something bad happened!
+            self.log.error(response.response.body)
+            self.log.exception(response.error)
+            response.rethrow
+
+        credentials_zip = ZipFile(response.buffer, "r")
         credentials_zip.extractall("/root/.carina/clusters/{}".format(self.user.name))
         self.log.info("Credentials downloaded to /root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name))
 
     def get_user_credentials_dir(self):
         credentials_dir = "/root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name)
-        self.log.info("The credentials directory is: {}".format(credentials_dir))
-
         docker_env_path = os.path.join(credentials_dir, "docker.env")
-        self.log.info("The docker env path is: {}".format(docker_env_path))
         if not os.path.exists(docker_env_path):
             raise RuntimeError("Unable to find docker.env")
 
