@@ -18,6 +18,7 @@ CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
 class CarinaSpawner(DockerSpawner):
 
     cluster_name = "howtowhale"
+    cluster_polling_interval = 30
     extra_host_config = {
         'volumes_from': ['swarm-data'],
         'port_bindings': {8888: None}
@@ -177,11 +178,10 @@ class CarinaSpawner(DockerSpawner):
                 self.log.info("Credentials received")
                 break
 
-            if response.code == 404:
-                if "cluster is not yet active" in response.body.decode(encoding='UTF-8'):
-                    self.log.info("The {}/{} cluster is not yet active, retrying in 30s...".format(self.user.name, self.cluster_name))
-                    yield gen.sleep(30)
-                    continue
+            if response.code == 404 and "cluster is not yet active" in response.body.decode(encoding='UTF-8'):
+                self.log.info("The {}/{} cluster is not yet active, retrying in {}s...".format(self.user.name, self.cluster_name, self.cluster_polling_interval))
+                yield gen.sleep(self.cluster_polling_interval)
+                continue
 
             # abort, something bad happened!
             self.log.error(response.response.body)
