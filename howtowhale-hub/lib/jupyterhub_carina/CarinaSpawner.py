@@ -18,7 +18,10 @@ CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
 class CarinaSpawner(DockerSpawner):
 
     cluster_name = "howtowhale"
-    volumes = { '/var/run/docker.sock': '/var/run/docker.sock' }
+    extra_host_config = {
+        'volumes_from': ['swarm-data'],
+        'port_bindings': {8888: None}
+    }
 
     @property
     def client(self):
@@ -72,10 +75,17 @@ class CarinaSpawner(DockerSpawner):
             self.log.warn("image pulled!")
 
             self.log.warn('starting user container...')
-            yield super(CarinaSpawner, self).start(
-                image=image,
-                extra_host_config={'port_bindings': {8888: None}},
-            )
+            extra_env = {
+                'DOCKER_HOST': self.client.base_url.replace("https://", "tcp://"),
+                'DOCKER_TLS_VERIFY': 1,
+                'DOCKER_CERT_PATH': '/var/run/docker/'
+            }
+            extra_env.update(self.get_env())
+            extra_create_kwargs = {
+                'environment': extra_env
+            }
+
+            yield super().start(image=image, extra_create_kwargs=extra_create_kwargs)
 
             container = yield self.get_container()
             if container is not None:
