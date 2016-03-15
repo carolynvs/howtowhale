@@ -63,19 +63,15 @@ class CarinaSpawner(DockerSpawner):
         return container
 
     @gen.coroutine
-    def start(self, image=None):
+    def start(self):
         try:
-            self.log.warn("starting notebook for {}...".format(self.user.name))
+            self.log.info("Creating notebook infrastructure for {}...".format(self.user.name))
 
             yield self.create_cluster()
             yield self.download_cluster_credentials()
+            yield self.pull_image()
 
-            self.log.warn("pulling image...")
-            pull_kwargs = dict(repository="carolynvs/howtowhale-user")
-            yield self.docker("pull", **pull_kwargs)
-            self.log.warn("image pulled!")
-
-            self.log.warn('starting user container...')
+            self.log.info("Starting notebook container for {}...".format(self.user.name))
             extra_env = {
                 'DOCKER_HOST': self.client.base_url.replace("https://", "tcp://"),
                 'DOCKER_TLS_VERIFY': 1,
@@ -86,7 +82,7 @@ class CarinaSpawner(DockerSpawner):
                 'environment': extra_env
             }
 
-            yield super().start(image=image, extra_create_kwargs=extra_create_kwargs)
+            yield super().start(extra_create_kwargs=extra_create_kwargs)
 
             container = yield self.get_container()
             if container is not None:
@@ -95,20 +91,18 @@ class CarinaSpawner(DockerSpawner):
                 self.log.info("{} was started on {} ({}:{})".format(
                     self.container_name, node_name, self.user.server.ip, self.user.server.port))
 
-            self.log.warn('startup complete!')
+            self.log.debug('Startup for {} is complete!'.format(self.user.name))
         except Exception as e:
-            self.log.error('startup failed')
+            self.log.error('Startup for {} failed!'.format(self.user.name))
             self.log.exception(e)
             raise
 
     @gen.coroutine
     def poll(self):
-        self.log.warn('polling...')
-
         """Check for my id in `docker ps`"""
         container = yield self.get_container()
         if not container:
-            self.log.warn("container not found")
+            self.log.info("Notebook container for {} was not found".format(self.user.name))
             return ""
 
         container_state = container['State']
@@ -175,7 +169,7 @@ class CarinaSpawner(DockerSpawner):
             response = yield http_client.fetch(request, raise_error=False)
 
             if response.error is None:
-                self.log.info("Credentials received")
+                self.log.debug("Credentials for {}/{} received.".format(self.user.name, self.cluster_name))
                 break
 
             if response.code == 404 and "cluster is not yet active" in response.body.decode(encoding='UTF-8'):
@@ -202,10 +196,6 @@ class CarinaSpawner(DockerSpawner):
 
     @gen.coroutine
     def pull_image(self):
-        self.log.warn("pulling image...")
-
-        output = yield self.docker("pull", "carolynvs/howtowhale-user")
-        for line in output:
-            self.log.warn(json.dumps(json.loads(line), indent=4))
-
-        self.log.warn("image pulled!")
+        self.log.debug("Starting to pull {} image to the {} cluster...".format(self.container_image, self.user.name))
+        yield self.docker("pull", self.container_image)
+        self.log.debug("Finished pulling {} image to the {} cluster...".format(self.container_image, self.user.name))
