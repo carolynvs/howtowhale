@@ -1,6 +1,7 @@
 #!/bin/sh
+set -e
 
-
+eval $(carina env howtowhale-com)
 docker ps -qa --filter="name=howtowhale" | xargs docker rm -vf
 
 docker build -t carolynvs/howtowhale-user howtowhale-user/
@@ -12,6 +13,9 @@ docker build -t carolynvs/howtowhale-proxy howtowhale-proxy/
 docker run --name howtowhale-hub \
   -d -p 8081:8081 \
   --volumes-from swarm-data:ro \
+  -e CARINA_OAUTH_HOST=carina-oauth.carolynvs.com \
+  -e CARINA_CLIENT_ID=$CARINA_CLIENT_ID \
+  -e CARINA_CLIENT_SECRET=$CARINA_CLIENT_SECRET \
   -e DOCKER_HOST=https://${DOCKER_HOST#tcp://} \
   carolynvs/howtowhale-hub
 
@@ -21,3 +25,6 @@ docker run --name howtowhale-proxy \
   -d --link howtowhale-hub:howtowhale-hub -p 80:80 -p 443:443 \
   --volumes-from letsencrypt-data \
   carolynvs/howtowhale-proxy
+
+eval $(carina env howtowhale)
+docker ps -qa --filter="name=howtowhale-carolynvs" | xargs docker rm -vf
