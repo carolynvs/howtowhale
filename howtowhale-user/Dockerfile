@@ -1,10 +1,12 @@
-FROM jupyter/singleuser
+FROM carolynvs/minimal-notebook
 
 # Continue image setup
 USER root
 
 # Install useful utilities
-RUN apt-get install -y curl
+RUN apt-get update && \
+    apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Bash kernel
 RUN pip install bash_kernel && \
