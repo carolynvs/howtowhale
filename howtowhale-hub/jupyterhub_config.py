@@ -13,7 +13,6 @@ c.CarinaSpawner.http_timeout = 300
 
 # Configure oauth
 c.Authenticator.admin_users = ["carolynvs"]
-c.Authenticator.whitelist = ["carolynvs"]
 c.JupyterHub.authenticator_class = "jupyterhub_carina.CarinaAuthenticator"
 c.CarinaAuthenticator.oauth_callback_url = "https://howtowhale.com/hub/oauth_callback"
 c.CarinaAuthenticator.client_id = os.environ["CARINA_CLIENT_ID"]
