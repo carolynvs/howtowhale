@@ -1,4 +1,4 @@
-FROM carolynvs/minimal-notebook
+FROM carolynvs/minimal-notebook:8dfd60b729bf
 
 # Continue image setup
 USER root
