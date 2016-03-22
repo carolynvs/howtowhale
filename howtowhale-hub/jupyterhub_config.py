@@ -9,7 +9,14 @@ c.CarinaSpawner.hub_ip_connect = "DOMAIN"
 c.CarinaSpawner.container_prefix = "howtowhale"
 c.CarinaSpawner.container_image = "carolynvs/howtowhale-user:VERSION"
 c.CarinaSpawner.start_timeout = 300
-c.CarinaSpawner.http_timeout = 300
+
+# Debug ALL THE THINGS!
+c.JupyterHub.log_level = 'DEBUG'
+c.JupyterHub.admin_access = True
+c.Spawner.debug = True
+c.DockerSpawner.debug = True
+c.CarinaSpawner.debug = True
+c.Spawner.args = ['--debug', '--NotebookApp.default_url=/notebooks/TryDocker.ipynb']
 
 # Configure oauth
 c.Authenticator.admin_users = ["carolynvs"]
