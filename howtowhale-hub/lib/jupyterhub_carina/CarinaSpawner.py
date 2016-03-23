@@ -24,42 +24,40 @@ class CarinaSpawner(DockerSpawner):
         'port_bindings': {8888: None}
     }
 
+    _client = None
     @property
     def client(self):
-        carina_dir = self.get_user_credentials_dir()
-        tls_config = docker.tls.TLSConfig(
-            client_cert=(os.path.join(carina_dir, 'cert.pem'),
-                         os.path.join(carina_dir, 'key.pem')),
-            ca_cert=os.path.join(carina_dir, 'ca.pem'),
-            verify=os.path.join(carina_dir, 'ca.pem'),
-            assert_hostname=False)
-        with open(os.path.join(carina_dir, 'docker.env')) as f:
-            env = f.read()
-        docker_host = re.findall("DOCKER_HOST=tcp://(\d+\.\d+\.\d+\.\d+:\d+)", env)[0]
-        docker_host = 'https://' + docker_host
-        client = docker.Client(version='auto', tls=tls_config, base_url=docker_host, timeout=300)
+        """
+        The Docker client used to connect to the user's Carina cluster
+        """
 
-        return client
+        # Use the same client for each Spawner instance
+        if self._client is None:
+            carina_dir = self.get_user_credentials_dir()
+            docker_env = os.path.join(carina_dir, 'docker.env')
+            if not os.path.exists(docker_env):
+                raise RuntimeError("ERROR! The credentials for {}/{} could not be found in {}.".format(self.user.name, self.cluster_name, carina_dir))
+
+            tls_config = docker.tls.TLSConfig(
+                client_cert=(os.path.join(carina_dir, 'cert.pem'),
+                             os.path.join(carina_dir, 'key.pem')),
+                ca_cert=os.path.join(carina_dir, 'ca.pem'),
+                verify=os.path.join(carina_dir, 'ca.pem'),
+                assert_hostname=False)
+            with open(docker_env) as f:
+                env = f.read()
+            docker_host = re.findall("DOCKER_HOST=tcp://(\d+\.\d+\.\d+\.\d+:\d+)", env)[0]
+            docker_host = 'https://' + docker_host
+            self._client = docker.Client(version='auto', tls=tls_config, base_url=docker_host)
+
+        return self._client
 
     @gen.coroutine
     def get_container(self):
-        if not self.container_id:
+        if not os.path.exists(self.get_user_credentials_dir()):
             return None
 
-        self.log.debug("Getting container: %s", self.container_id)
-        try:
-            container = yield self.docker(
-                'inspect_container', self.container_id
-            )
-            self.container_id = container['Id']
-        except APIError as e:
-            if e.response.status_code == 404:
-                self.log.info("Container '%s' is gone", self.container_id)
-                container = None
-                # my container is gone, forget my id
-                self.container_id = ''
-            else:
-                raise
+        container = yield super().get_container()
         return container
 
     @gen.coroutine
@@ -69,7 +67,6 @@ class CarinaSpawner(DockerSpawner):
 
             yield self.create_cluster()
             yield self.download_cluster_credentials()
-            yield self.pull_image()
 
             self.log.info("Starting notebook container for {}...".format(self.user.name))
             extra_env = {
@@ -84,42 +81,11 @@ class CarinaSpawner(DockerSpawner):
 
             yield super().start(extra_create_kwargs=extra_create_kwargs)
 
-            container = yield self.get_container()
-            if container is not None:
-                node_name = container['Node']['IP']
-                self.user.server.ip = node_name
-                self.log.info("{} was started on {} ({}:{})".format(
-                    self.container_name, node_name, self.user.server.ip, self.user.server.port))
-
             self.log.debug('Startup for {} is complete!'.format(self.user.name))
         except Exception as e:
             self.log.error('Startup for {} failed!'.format(self.user.name))
             self.log.exception(e)
             raise
-
-    @gen.coroutine
-    def poll(self):
-        """Check for my id in `docker ps`"""
-        container = yield self.get_container()
-        if not container:
-            self.log.info("Notebook container for {} was not found".format(self.user.name))
-            return ""
-
-        container_state = container['State']
-        self.log.debug(
-            "Container %s status: %s",
-            self.container_id[:7],
-            pprint.pformat(container_state),
-        )
-
-        if container_state["Running"]:
-            return None
-        else:
-            return (
-                "ExitCode={ExitCode}, "
-                "Error='{Error}', "
-                "FinishedAt={FinishedAt}".format(**container_state)
-            )
 
     @gen.coroutine
     def create_cluster(self):
@@ -154,6 +120,9 @@ class CarinaSpawner(DockerSpawner):
         The API will return 404 if the cluster isn't available yet,
         in which case the reqeust should be retried
         """
+        credentials_dir = self.get_user_credentials_dir()
+        if os.path.exists(credentials_dir):
+            return
 
         self.log.info("Downloading {} cluster credentials for {}...".format(self.cluster_name, self.user.name))
 
@@ -188,14 +157,4 @@ class CarinaSpawner(DockerSpawner):
 
     def get_user_credentials_dir(self):
         credentials_dir = "/root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name)
-        docker_env_path = os.path.join(credentials_dir, "docker.env")
-        if not os.path.exists(docker_env_path):
-            raise RuntimeError("Unable to find docker.env")
-
         return credentials_dir
-
-    @gen.coroutine
-    def pull_image(self):
-        self.log.debug("Starting to pull {} image to the {} cluster...".format(self.container_image, self.user.name))
-        yield self.docker("pull", self.container_image)
-        self.log.debug("Finished pulling {} image to the {} cluster...".format(self.container_image, self.user.name))
