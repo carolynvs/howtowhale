@@ -81,13 +81,6 @@ class CarinaSpawner(DockerSpawner):
 
             yield super().start(extra_create_kwargs=extra_create_kwargs)
 
-            container = yield self.get_container()
-            if container is not None:
-                node_name = container['Node']['IP']
-                self.user.server.ip = node_name
-                self.log.info("{} was started on {} ({}:{})".format(
-                    self.container_name, node_name, self.user.server.ip, self.user.server.port))
-
             self.log.debug('Startup for {} is complete!'.format(self.user.name))
         except Exception as e:
             self.log.error('Startup for {} failed!'.format(self.user.name))
