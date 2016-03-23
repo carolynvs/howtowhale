@@ -88,30 +88,6 @@ class CarinaSpawner(DockerSpawner):
             raise
 
     @gen.coroutine
-    def poll(self):
-        """Check for my id in `docker ps`"""
-        container = yield self.get_container()
-        if not container:
-            self.log.info("Notebook container for {} was not found".format(self.user.name))
-            return ""
-
-        container_state = container['State']
-        self.log.debug(
-            "Container %s status: %s",
-            self.container_id[:7],
-            pprint.pformat(container_state),
-        )
-
-        if container_state["Running"]:
-            return None
-        else:
-            return (
-                "ExitCode={ExitCode}, "
-                "Error='{Error}', "
-                "FinishedAt={FinishedAt}".format(**container_state)
-            )
-
-    @gen.coroutine
     def create_cluster(self):
         """
         Create a Carina cluster.
