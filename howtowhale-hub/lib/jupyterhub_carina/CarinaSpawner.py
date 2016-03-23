@@ -54,23 +54,10 @@ class CarinaSpawner(DockerSpawner):
 
     @gen.coroutine
     def get_container(self):
-        if not self.container_id:
+        if not os.path.exists(self.get_user_credentials_dir()):
             return None
 
-        self.log.debug("Getting container: %s", self.container_id)
-        try:
-            container = yield self.docker(
-                'inspect_container', self.container_id
-            )
-            self.container_id = container['Id']
-        except APIError as e:
-            if e.response.status_code == 404:
-                self.log.info("Container '%s' is gone", self.container_id)
-                container = None
-                # my container is gone, forget my id
-                self.container_id = ''
-            else:
-                raise
+        container = yield super().get_container()
         return container
 
     @gen.coroutine
