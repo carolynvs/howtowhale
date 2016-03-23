@@ -120,6 +120,9 @@ class CarinaSpawner(DockerSpawner):
         The API will return 404 if the cluster isn't available yet,
         in which case the reqeust should be retried
         """
+        credentials_dir = self.get_user_credentials_dir()
+        if os.path.exists(credentials_dir):
+            return
 
         self.log.info("Downloading {} cluster credentials for {}...".format(self.cluster_name, self.user.name))
 
