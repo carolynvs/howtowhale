@@ -1,3 +1,12 @@
+#!/bin/sh
+set -e
+
+carina create --wait howtowhale-dev
+carina credentials howtowhale-dev
+eval $(carina env howtowhale-dev)
+
+stop, get the ip address for the cluster and update DNS
+
 docker run \
   --name letsencrypt-data \
   --volume /etc/letsencrypt \
@@ -19,7 +28,7 @@ docker run \
   --publish 80:80 \
   quay.io/letsencrypt/letsencrypt certonly \
   --server https://acme-v01.api.letsencrypt.org/directory \
-  --domain howtowhale.com \
+  --domain dev.howtowhale.com \
   --authenticator standalone \
   --email me@carolynvanslyck.com \
   --agree-tos

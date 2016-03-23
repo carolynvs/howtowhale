@@ -1,8 +1,13 @@
 FROM jupyter/jupyterhub:0.5.0
 
-RUN pip install dockerspawner
+ARG domain
+ARG version
 
 ADD lib /tmp/howtowhale-lib
-RUN pip install /tmp/howtowhale-lib
 
-CMD ["jupyterhub", "--no-ssl", "-f", "/srv/jupyterhub/jupyterhub_config.py"]
+RUN pip install dockerspawner && \
+    pip install /tmp/howtowhale-lib && \
+    sed -i "s/DOMAIN/${domain}/g" /srv/jupyterhub/jupyterhub_config.py && \
+    sed -i "s/VERSION/${version}/g" /srv/jupyterhub/jupyterhub_config.py
+
+CMD ["jupyterhub", "--debug", "--no-ssl", "-f", "/srv/jupyterhub/jupyterhub_config.py"]
