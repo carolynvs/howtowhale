@@ -24,22 +24,33 @@ class CarinaSpawner(DockerSpawner):
         'port_bindings': {8888: None}
     }
 
+    _client = None
     @property
     def client(self):
-        carina_dir = self.get_user_credentials_dir()
-        tls_config = docker.tls.TLSConfig(
-            client_cert=(os.path.join(carina_dir, 'cert.pem'),
-                         os.path.join(carina_dir, 'key.pem')),
-            ca_cert=os.path.join(carina_dir, 'ca.pem'),
-            verify=os.path.join(carina_dir, 'ca.pem'),
-            assert_hostname=False)
-        with open(os.path.join(carina_dir, 'docker.env')) as f:
-            env = f.read()
-        docker_host = re.findall("DOCKER_HOST=tcp://(\d+\.\d+\.\d+\.\d+:\d+)", env)[0]
-        docker_host = 'https://' + docker_host
-        client = docker.Client(version='auto', tls=tls_config, base_url=docker_host, timeout=300)
+        """
+        The Docker client used to connect to the user's Carina cluster
+        """
 
-        return client
+        # Use the same client for each Spawner instance
+        if self._client is None:
+            carina_dir = self.get_user_credentials_dir()
+            docker_env = os.path.join(carina_dir, 'docker.env')
+            if not os.path.exists(docker_env):
+                raise RuntimeError("ERROR! The credentials for {}/{} could not be found in {}.".format(self.user.name, self.cluster_name, carina_dir))
+
+            tls_config = docker.tls.TLSConfig(
+                client_cert=(os.path.join(carina_dir, 'cert.pem'),
+                             os.path.join(carina_dir, 'key.pem')),
+                ca_cert=os.path.join(carina_dir, 'ca.pem'),
+                verify=os.path.join(carina_dir, 'ca.pem'),
+                assert_hostname=False)
+            with open(docker_env) as f:
+                env = f.read()
+            docker_host = re.findall("DOCKER_HOST=tcp://(\d+\.\d+\.\d+\.\d+:\d+)", env)[0]
+            docker_host = 'https://' + docker_host
+            self._client = docker.Client(version='auto', tls=tls_config, base_url=docker_host)
+
+        return self._client
 
     @gen.coroutine
     def get_container(self):
@@ -188,12 +199,7 @@ class CarinaSpawner(DockerSpawner):
 
     def get_user_credentials_dir(self):
         credentials_dir = "/root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name)
-        docker_env_path = os.path.join(credentials_dir, "docker.env")
-        if not os.path.exists(docker_env_path):
-            raise RuntimeError("Unable to find docker.env")
-
         return credentials_dir
-
     @gen.coroutine
     def pull_image(self):
         self.log.debug("Starting to pull {} image to the {} cluster...".format(self.container_image, self.user.name))
