@@ -1,0 +1,11 @@
+.jumbotron {
+  background-color: #e1eaef;
+}
+
+img.emoji {
+  width: 32px;
+}
+
+a img {
+  margin-right: 0.5em;
+}
