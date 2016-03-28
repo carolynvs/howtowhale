@@ -1,6 +1,7 @@
 import os
 
 c = get_config()
+c.JupyterHub.db_url = 'mysql://jupyterhub:{}@{}:3306/jupyterhub'.format(os.getenv("DB_PASSWORD"), os.getenv("DB_HOST"))
 
 # Run notebooks in separate container
 c.JupyterHub.hub_ip = "0.0.0.0"

@@ -5,7 +5,11 @@ ARG version
 
 ADD lib /tmp/howtowhale-lib
 
-RUN pip install dockerspawner && \
+RUN apt-get update && \
+    apt-get install -y libmysqlclient-dev && \
+    apt-get autoremove -y && \
+    pip install mysqlclient && \
+    pip install dockerspawner && \
     pip install /tmp/howtowhale-lib && \
     sed -i "s/DOMAIN/${domain}/g" /srv/jupyterhub/jupyterhub_config.py && \
     sed -i "s/VERSION/${version}/g" /srv/jupyterhub/jupyterhub_config.py
