@@ -3,6 +3,9 @@ import os
 c = get_config()
 c.JupyterHub.db_url = 'mysql://jupyterhub:{}@{}:3306/jupyterhub'.format(os.getenv("DB_PASSWORD"), os.getenv("DB_HOST"))
 
+c.JupyterHub.base_url = "/jupyter"
+c.JupyterHub.confirm_no_ssl = True
+
 # Run notebooks in separate container
 c.JupyterHub.hub_ip = "0.0.0.0"
 c.JupyterHub.spawner_class = "jupyterhub_carina.CarinaSpawner"

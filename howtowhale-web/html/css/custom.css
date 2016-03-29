@@ -9,3 +9,7 @@ img.emoji {
 a img {
   margin-right: 0.5em;
 }
+
+.navbar {
+  border-radius: 0;
+}

@@ -21,6 +21,10 @@ echo "### Build the user's notebook server"
 docker build -t carolynvs/howtowhale-user:$VERSION howtowhale-user/
 docker push carolynvs/howtowhale-user:$VERSION
 
+echo "### Run the static site"
+docker build -t carolynvs/howtowhale-web:$VERSION howtowhale-web/
+docker run --name howtowhale-web carolynvs/howtowhale-web:$VERSION
+
 echo "### Build the hub"
 docker build -t carolynvs/howtowhale-hub:$VERSION \
   --build-arg version=$VERSION \
@@ -49,6 +53,7 @@ docker run --name howtowhale-proxy \
   -d -p 80:80 -p 443:443 \
   --link howtowhale-hub:howtowhale-hub \
   --volumes-from letsencrypt-data \
+  --volumes-from howtowhale-web \
   carolynvs/howtowhale-proxy
 
 echo "# Cleanup my test user"

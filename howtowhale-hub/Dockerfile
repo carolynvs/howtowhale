@@ -4,6 +4,7 @@ ARG domain
 ARG version
 
 ADD lib /tmp/howtowhale-lib
+ADD bootstrap.cerulean.min.css /srv/jupyterhub/share/jupyter/hub/static/components/bootstrap/css/boostrap.min.css
 
 RUN apt-get update && \
     apt-get install -y libmysqlclient-dev && \
