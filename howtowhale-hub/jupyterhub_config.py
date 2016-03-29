@@ -25,6 +25,6 @@ c.Spawner.args = ['--debug', '--NotebookApp.default_url=/notebooks/TryDocker.ipy
 # Configure oauth
 c.Authenticator.admin_users = ["carolynvs"]
 c.JupyterHub.authenticator_class = "jupyterhub_carina.CarinaAuthenticator"
-c.CarinaAuthenticator.oauth_callback_url = "https://DOMAIN/hub/oauth_callback"
+c.CarinaAuthenticator.oauth_callback_url = "https://DOMAIN/jupyter/hub/oauth_callback"
 c.CarinaAuthenticator.client_id = os.environ["CARINA_CLIENT_ID"]
 c.CarinaAuthenticator.client_secret = os.environ["CARINA_CLIENT_SECRET"]
