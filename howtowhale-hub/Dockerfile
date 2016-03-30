@@ -1,17 +1,19 @@
 FROM jupyter/jupyterhub:0.5.0
 
-ARG domain
-ARG version
-
 ADD lib /tmp/howtowhale-lib
+ADD jupyterhub-web /srv/jupyterhub/share/jupyter/hub
+
+# Customize JupyterHub installation
+RUN python setup.py js && \
+    npm install && \
+    pip install --upgrade --no-deps --force-reinstall . && \
+    rm -rf node_modules ~/.cache ~/.npm
 
 RUN apt-get update && \
     apt-get install -y libmysqlclient-dev && \
     apt-get autoremove -y && \
     pip install mysqlclient && \
     pip install dockerspawner && \
-    pip install /tmp/howtowhale-lib && \
-    sed -i "s/DOMAIN/${domain}/g" /srv/jupyterhub/jupyterhub_config.py && \
-    sed -i "s/VERSION/${version}/g" /srv/jupyterhub/jupyterhub_config.py
+    pip install /tmp/howtowhale-lib
 
 CMD ["jupyterhub", "--debug", "--no-ssl", "-f", "/srv/jupyterhub/jupyterhub_config.py"]

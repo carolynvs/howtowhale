@@ -1,0 +1,28 @@
+{% extends "page.html" %}
+
+{% block login_widget %}
+{% endblock %}
+
+{% block main %}
+
+{% block login %}
+<div id="login-main" class="container">
+
+  <div class="service-login">
+    <a class="btn btn-jupyter btn-lg" href="{{login_url}}">
+      Sign in with {{login_service}}
+    </a>
+    <p>
+      <a href="https://app.getcarina.com/app/signup" target="_blank">Create an account</a>
+    </p>
+  </div>
+
+</div>
+{% endblock login %}
+
+{% endblock %}
+
+{% block script %}
+{{super()}}
+
+{% endblock %}

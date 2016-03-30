@@ -1,0 +1,24 @@
+.jumbotron {
+  background-color: #e1eaef;
+}
+
+img.emoji {
+  width: 32px;
+}
+
+a img {
+  margin-right: 0.5em;
+}
+
+.navbar {
+  border-radius: 0;
+}
+
+#logo {
+  margin-top: -10px;
+}
+
+.platform {
+  display: table;
+  margin: 5em auto;
+}
