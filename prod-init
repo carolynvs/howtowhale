@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e
+
+#carina create --wait howtowhale-prod
+#carina credentials howtowhale-prod
+eval $(carina env howtowhale-prod)
+
+#stop, get the ip address for the cluster and update DNS
+
+docker run \
+  --name letsencrypt-data \
+  --volume /etc/letsencrypt \
+  --volume /var/lib/letsencrypt \
+  --entrypoint /bin/mkdir \
+  quay.io/letsencrypt/letsencrypt \
+  -p /etc/letsencrypt/webrootauth/
+
+docker run \
+  --rm --interactive --tty \
+  --volumes-from letsencrypt-data \
+  nginx \
+  openssl dhparam -out /etc/letsencrypt/dhparams.pem 2048
+
+docker run \
+  --rm \
+  --volumes-from letsencrypt-data \
+  --publish 443:443 \
+  --publish 80:80 \
+  quay.io/letsencrypt/letsencrypt certonly \
+  --server https://acme-v01.api.letsencrypt.org/directory \
+  --domain howtowhale.com \
+  --authenticator standalone \
+  --email me@carolynvanslyck.com \
+  --agree-tos
