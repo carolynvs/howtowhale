@@ -34,13 +34,11 @@
 /* Main marketing message and sign up button */
 .jumbotron {
   border-bottom: 1px solid #e5e5e5;
+  text-align: center;
 }
 .jumbotron .btn {
   padding: 14px 24px;
   font-size: 21px;
-}
-.jumbotron h1 {
-  text-align: center;
 }
 
 /* Supporting marketing content */
