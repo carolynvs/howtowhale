@@ -30,13 +30,17 @@
     <nav class="navbar navbar-default">
       <div class="container-fluid">
         <div class="navbar-header">
-          <a class="navbar-brand" href="/">How to Whale</a>
+          <a class="navbar-brand" href="/">
+            <img id="logo" src="/img/howtowhale.png" alt="Docker Docker Docker MUSHROOM!" title="Docker Docker Docker MUSHROOM!" />
+          </a>
         </div>
 
         <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
           <ul class="nav navbar-nav">
-            <li><a href="#">How it works</a></li>
+            <li><a href="#magic">How it works</a></li>
+            <li><a href="#evil-intentions">About How to Whale</a></li>
           </ul>
+          <!-- TODO: Display current user
           <ul class="nav navbar-nav navbar-right">
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">carolynvs <span class="caret"></span></a>
@@ -45,6 +49,7 @@
               </ul>
             </li>
           </ul>
+          -->
         </div>
       </div>
     </nav>
@@ -62,10 +67,9 @@
         <div class="text-center"><a class="btn btn-lg btn-success" href="/jupyter/" role="button">Try Docker</a></div>
       </div>
 
-      <h2>Cool things to try</h2>
+      <h2 id="cool-stuff">What can I do?</h2>
       <p>
-        Not sure what you would do with Docker? Wonder no more! Here are some things you can try in
-        under 10 minutes:
+        Here are some things you can do try out in under 10 minutes:
       </p>
       <div class="row marketing">
         <div class="col-lg-6">
@@ -103,12 +107,37 @@
         </div>
       </div>
 
-      <footer class="footer">
-        <div class="col-md-6">&copy; 2016 Carolyn Van Slyck</div>
-        <div class="col-md-6 text-right"><img src="/img/powered-by-carina.png" /></div>
-      </footer>
+      <h2 id="magic">How does it work?</h2>
+      <p>
+        With the help of <a href="http://getcarina.com">Carina</a>,
+        a Docker Swarm cluster is created just for you, running <a href="http://jupyter.org">Jupyter</a>
+        in a Docker container. It's populated with a number of Jupyter notebooks where
+        you can interact directly with your Docker Swarm cluster and learn Docker
+        all from the comfort of your web browser.
 
+        So is it magic? Nope, just massively abusing cool stuff for fun and profit.
+      </p>
+      <div class="platform">
+        <a href="http://getcarina.com"><img src="/img/jupyter.png" alt="Jupyter Logo" /></a>
+        <a href="http://jupyter.org"><img src="/img/carina.png" alt="Carina by Rackspace Logo" /></a>
+      </div>
+
+      <h2 id="evil-intentions">Why How to Whale?</h2>
+      <p>Because if I named this "Try Docker", I would get in trouble...</p>
+      <p>
+        I've always loved <a href="http://codeschool.com">Code School</a>.
+        Learning a new language without having to install anything on my machine,
+        configure my development environment or deal with the differences between operating systems.
+        One day I took <a href="http://safia.rocks">Safia's</a> data analytics workshop
+        and got my first taste of what Jupyter can do and decided to use it
+        to teach Docker.
+      </p>
     </div> <!-- /container -->
+
+    <footer class="footer">
+      <div class="col-md-6">&copy; 2016 Carolyn Van Slyck</div>
+      <div class="col-md-6 text-right"><img src="/img/powered-by-carina.png" /></div>
+    </footer>
 
     <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>

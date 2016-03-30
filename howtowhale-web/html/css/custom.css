@@ -13,3 +13,12 @@ a img {
 .navbar {
   border-radius: 0;
 }
+
+#logo {
+  margin-top: -10px;
+}
+
+.platform {
+  display: table;
+  margin: 5em auto;
+}
