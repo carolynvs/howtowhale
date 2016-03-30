@@ -1,5 +1,8 @@
 import os
 
+domain = os.getenv('DOMAIN')
+version = os.getenv('VERSION')
+
 c = get_config()
 c.JupyterHub.db_url = 'mysql://jupyterhub:{}@{}:3306/jupyterhub'.format(os.getenv("DB_PASSWORD"), os.getenv("DB_HOST"))
 
@@ -9,9 +12,9 @@ c.JupyterHub.confirm_no_ssl = True
 # Run notebooks in separate container
 c.JupyterHub.hub_ip = "0.0.0.0"
 c.JupyterHub.spawner_class = "jupyterhub_carina.CarinaSpawner"
-c.CarinaSpawner.hub_ip_connect = "DOMAIN"
+c.CarinaSpawner.hub_ip_connect = domain
 c.CarinaSpawner.container_prefix = "howtowhale"
-c.CarinaSpawner.container_image = "carolynvs/howtowhale-user:VERSION"
+c.CarinaSpawner.container_image = "carolynvs/howtowhale-user:{}".format(version)
 c.CarinaSpawner.start_timeout = 300
 
 # Debug ALL THE THINGS!
@@ -25,6 +28,6 @@ c.Spawner.args = ['--debug', '--NotebookApp.default_url=/notebooks/TryDocker.ipy
 # Configure oauth
 c.Authenticator.admin_users = ["carolynvs"]
 c.JupyterHub.authenticator_class = "jupyterhub_carina.CarinaAuthenticator"
-c.CarinaAuthenticator.oauth_callback_url = "https://DOMAIN/jupyter/hub/oauth_callback"
+c.CarinaAuthenticator.oauth_callback_url = "https://{}/jupyter/hub/oauth_callback".format(domain)
 c.CarinaAuthenticator.client_id = os.environ["CARINA_CLIENT_ID"]
 c.CarinaAuthenticator.client_secret = os.environ["CARINA_CLIENT_SECRET"]

@@ -27,8 +27,6 @@ docker run --name howtowhale-web carolynvs/howtowhale-web:$VERSION
 
 echo "### Build the hub"
 docker build -t carolynvs/howtowhale-hub:$VERSION \
-  --build-arg version=$VERSION \
-  --build-arg domain=dev.howtowhale.com \
   howtowhale-hub/
 docker build -t carolynvs/howtowhale-proxy \
   --build-arg domain=dev.howtowhale.com \
@@ -39,6 +37,8 @@ echo "### Spin up the hub"
 docker run --name howtowhale-hub \
   -d -p 8081:8081 \
   --volumes-from swarm-data:ro \
+  -e VERSION=$VERSION \
+  -e DOMAIN=dev.howtowhale.com \
   -e CARINA_OAUTH_HOST=oauth.getcarina.com \
   -e CARINA_CLIENT_ID=$CARINA_DEV_CLIENT_ID \
   -e CARINA_CLIENT_SECRET=$CARINA_DEV_CLIENT_SECRET \
