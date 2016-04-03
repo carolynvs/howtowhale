@@ -44,8 +44,10 @@ docker run --name howtowhale-hub \
   -e CARINA_CLIENT_SECRET=$CARINA_DEV_CLIENT_SECRET \
   -e DOCKER_HOST=https://${DOCKER_HOST#tcp://} \
   -e JPY_COOKIE_SECRET=$JPY_COOKIE_SECRET \
-  -e DB_PASSWORD=$DB_PASSWORD \
   -e DB_HOST=$DB_HOST \
+  -e DB_NAME=$DB_DEV_NAME \
+  -e DB_USERNAME=$DB_DEV_NAME \
+  -e DB_PASSWORD=$DB_DEV_PASSWORD \
   carolynvs/howtowhale-hub:$VERSION
 
 echo "### Spin up the proxy"

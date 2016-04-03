@@ -4,7 +4,7 @@ domain = os.getenv('DOMAIN')
 version = os.getenv('VERSION')
 
 c = get_config()
-c.JupyterHub.db_url = 'mysql://jupyterhub:{}@{}:3306/jupyterhub'.format(os.getenv("DB_PASSWORD"), os.getenv("DB_HOST"))
+c.JupyterHub.db_url = 'mysql://{}:{}@{}:3306/{}'.format(os.getenv("DB_USERNAME"), os.getenv("DB_PASSWORD"), os.getenv("DB_HOST"), os.getenv("DB_NAME"))
 
 c.JupyterHub.base_url = "/jupyter"
 c.JupyterHub.confirm_no_ssl = True
