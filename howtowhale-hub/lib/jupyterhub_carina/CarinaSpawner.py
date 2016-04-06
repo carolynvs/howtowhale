@@ -52,6 +52,30 @@ class CarinaSpawner(DockerSpawner):
 
         return self._client
 
+    _oauth_token = None
+    @property
+    def oauth_token(self):
+        if self._oauth_token is None:
+            self._oauth_token = self.retrieve_oauth_token()
+
+        return self._oauth_token
+
+    def get_state(self):
+        state = super().get_state()
+        if self.oauth_token:
+            state["oauth_token"] = self.oauth_token
+
+        return state
+
+    def load_state(self, state):
+        super().load_state(state)
+        self._oauth_token = state.get("oauth_token", None)
+
+    def clear_state(self):
+        super().clear_state()
+        # TODO: Move this to DockerSpawner
+        self.container_id = ''
+
     @gen.coroutine
     def get_container(self):
         if not os.path.exists(self.get_user_credentials_dir()):
@@ -99,7 +123,7 @@ class CarinaSpawner(DockerSpawner):
         http_client = AsyncHTTPClient()
         headers={"Accept": "application/json",
                  "User-Agent": "JupyterHub",
-                 "Authorization": "Bearer {}".format(self.authenticator.oauth_token)}
+                 "Authorization": "Bearer {}".format(self.oauth_token)}
         req = HTTPRequest(url=os.path.join(CARINA_CLUSTERS_URL, self.cluster_name),
                           method="PUT",
                           body="{}",
@@ -131,7 +155,7 @@ class CarinaSpawner(DockerSpawner):
                           method="GET",
                           headers={"Accept": "application/json",
                                    "User-Agent": "JupyterHub",
-                                   "Authorization": "Bearer {}".format(self.authenticator.oauth_token)})
+                                   "Authorization": "Bearer {}".format(self.oauth_token)})
 
         while True:
             # TODO: Abort after some set timeout, does jupyterhub handle that for us?
@@ -158,3 +182,10 @@ class CarinaSpawner(DockerSpawner):
     def get_user_credentials_dir(self):
         credentials_dir = "/root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name)
         return credentials_dir
+
+    def retrieve_oauth_token(self):
+        self.log.info("===retrieve oauth token===")
+        if self.authenticator is None or not self.authenticator.oauth_token:
+            raise RuntimeError("Could not find the oauth token for {}".format(self.user.name))
+
+        return self.authenticator.oauth_token
