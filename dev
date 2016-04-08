@@ -8,14 +8,10 @@ dvm use
 
 read -r BASE_FROM < howtowhale-user/Dockerfile
 BASE_TAG=${BASE_FROM#*:}
-VERSION=$(git describe --dirty='-dev')
+VERSION=$(git describe)
 
 echo "### Cleanup from previous runs"
 docker ps -qa --filter="name=howtowhale" | xargs docker rm -vf
-
-echo "### Build a minimal notebook server"
-docker build -t carolynvs/minimal-notebook:$BASE_TAG -f howtowhale-user/Dockerfile.minimal-notebook howtowhale-user/
-docker push carolynvs/minimal-notebook:$BASE_TAG
 
 echo "### Build the user's notebook server"
 docker build -t carolynvs/howtowhale-user:$VERSION howtowhale-user/

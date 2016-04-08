@@ -1,0 +1,3 @@
+echo "### Build a minimal notebook server"
+docker build -t carolynvs/minimal-notebook:$BASE_TAG -f howtowhale-user/Dockerfile.minimal-notebook howtowhale-user/
+docker push carolynvs/minimal-notebook:$BASE_TAG
