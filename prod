@@ -37,8 +37,8 @@ docker run --name howtowhale-hub \
   -e VERSION=$VERSION \
   -e DOMAIN=howtowhale.com \
   -e CARINA_OAUTH_HOST=oauth.getcarina.com \
-  -e CARINA_CLIENT_ID=$CARINA_CLIENT_ID \
-  -e CARINA_CLIENT_SECRET=$CARINA_CLIENT_SECRET \
+  -e OAUTH_CLIENT_ID=$CARINA_CLIENT_ID \
+  -e OAUTH_CLIENT_SECRET=$CARINA_CLIENT_SECRET \
   -e DOCKER_HOST=https://${DOCKER_HOST#tcp://} \
   -e JPY_COOKIE_SECRET=$JPY_COOKIE_SECRET \
   -e DB_HOST=$DB_HOST \

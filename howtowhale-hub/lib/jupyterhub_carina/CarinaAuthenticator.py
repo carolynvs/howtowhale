@@ -28,8 +28,6 @@ class CarinaLoginHandler(OAuthLoginHandler, CarinaMixin):
 class CarinaAuthenticator(OAuthenticator, LoggingConfigurable):
 
     login_service = "Carina"
-    client_id_env = 'CARINA_CLIENT_ID'
-    client_secret_env = 'CARINA_CLIENT_SECRET'
     login_handler = CarinaLoginHandler
 
     username_map = Dict(config=True, default_value={},

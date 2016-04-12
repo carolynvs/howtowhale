@@ -9,16 +9,34 @@ from io import StringIO
 from tornado import gen
 from tornado.httpclient import HTTPRequest, HTTPError, AsyncHTTPClient
 from zipfile import ZipFile
-
-
-CARINA_OAUTH_HOST = os.environ.get('CARINA_OAUTH_HOST') or 'oauth.getcarina.com'
-CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
-
+from traitlets import Unicode, Integer
 
 class CarinaSpawner(DockerSpawner):
 
-    cluster_name = "howtowhale"
-    cluster_polling_interval = 30
+CARINA_OAUTH_HOST = os.environ.get('CARINA_OAUTH_HOST') or 'oauth.getcarina.com'
+CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
+    # Expose configuration
+    oauth_callback_url = Unicode(
+        os.getenv('OAUTH_CALLBACK_URL', ''),
+        config=True,
+        help="""Callback URL to use.
+        Typically `https://{host}/hub/oauth_callback`"""
+    )
+
+    client_id_env = 'OAUTH_CLIENT_ID'
+    client_id = Unicode(config=True)
+    def _client_id_default(self):
+        return os.getenv(self.client_id_env, '')
+
+    client_secret_env = 'OAUTH_CLIENT_SECRET'
+    client_secret = Unicode(config=True)
+    def _client_secret_default(self):
+        return os.getenv(self.client_secret_env, '')
+
+    cluster_name = Unicode(config=True, default_value='jupyterhub')
+
+    cluster_polling_interval = Integer(config=True, default_value=30)
+
     extra_host_config = {
         'volumes_from': ['swarm-data'],
         'port_bindings': {8888: None},
