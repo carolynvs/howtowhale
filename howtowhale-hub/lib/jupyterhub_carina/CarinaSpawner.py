@@ -21,7 +21,11 @@ class CarinaSpawner(DockerSpawner):
     cluster_polling_interval = 30
     extra_host_config = {
         'volumes_from': ['swarm-data'],
-        'port_bindings': {8888: None}
+        'port_bindings': {8888: None},
+        'restart_policy': {
+            'MaximumRetryCount': 0,
+            'Name': 'always'
+        }
     }
 
     _client = None

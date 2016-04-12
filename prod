@@ -32,6 +32,7 @@ docker build -t carolynvs/howtowhale-proxy \
 echo "### Spin up the hub"
 docker run --name howtowhale-hub \
   -d -p 8081:8081 \
+  --restart always \
   --volumes-from swarm-data:ro \
   -e VERSION=$VERSION \
   -e DOMAIN=howtowhale.com \
@@ -49,6 +50,7 @@ docker run --name howtowhale-hub \
 echo "### Spin up the proxy"
 docker run --name howtowhale-proxy \
   -d -p 80:80 -p 443:443 \
+  --restart always \
   --link howtowhale-hub:howtowhale-hub \
   --volumes-from letsencrypt-data \
   --volumes-from howtowhale-web \
