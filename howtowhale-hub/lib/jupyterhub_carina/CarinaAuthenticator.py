@@ -1,103 +1,56 @@
-import json
-from jupyterhub.auth import Authenticator
-import os
-import subprocess
-import tempfile
 from tornado.auth import OAuth2Mixin
 from tornado import gen, web
-from tornado.httpclient import HTTPRequest, HTTPError, AsyncHTTPClient
-from traitlets import Unicode, Dict
+from traitlets import Dict
 from traitlets.config import LoggingConfigurable
-import urllib
 from .oauth2 import OAuthLoginHandler, OAuthenticator
-from pprint import pformat
-
-
-CARINA_OAUTH_HOST = os.environ.get('CARINA_OAUTH_HOST') or 'oauth.getcarina.com'
-CARINA_OAUTH_ACCESS_TOKEN_URL = "https://%s/oauth/token" % CARINA_OAUTH_HOST
-CARINA_OAUTH_IDENTITY_URL = "https://%s/me" % CARINA_OAUTH_HOST
+from .CarinaOAuthClient import CarinaOAuthClient
 
 
 class CarinaMixin(OAuth2Mixin):
-    _OAUTH_AUTHORIZE_URL = "https://%s/oauth/authorize" % CARINA_OAUTH_HOST
-    _OAUTH_ACCESS_TOKEN_URL = CARINA_OAUTH_ACCESS_TOKEN_URL
+    _OAUTH_AUTHORIZE_URL = CarinaOAuthClient.CARINA_AUTHORIZE_URL
+    _OAUTH_ACCESS_TOKEN_URL = CarinaOAuthClient.CARINA_TOKEN_URL
 
 class CarinaLoginHandler(OAuthLoginHandler, CarinaMixin):
     scope = ['identity', 'cluster_credentials', 'create_cluster']
 
 class CarinaAuthenticator(OAuthenticator, LoggingConfigurable):
-
-    login_service = "Carina"
-    client_id_env = 'CARINA_CLIENT_ID'
-    client_secret_env = 'CARINA_CLIENT_SECRET'
+    # Configure the base OAuthenticator
+    login_service = 'Carina'
     login_handler = CarinaLoginHandler
 
+    # Expose configuration options
     username_map = Dict(config=True, default_value={},
-                        help="""Optional dict to remap github usernames to nix usernames.
+                        help="""Optional dict to remap github usernames to system usernames.
 
-        User github usernames for keys and existing nix usernames as values.
+        User github usernames for keys and existing system usernames as values.
         cf https://github.com/jupyter/oauthenticator/issues/28
         """)
 
+
+    _carina_client = None
+    @property
+    def carina_client(self):
+        if self._carina_client is None:
+            self._carina_client = CarinaOAuthClient(self.client_id, self.client_secret, self.oauth_callback_url)
+
+        return self._carina_client
+
     @gen.coroutine
     def authenticate(self, handler):
-        code = handler.get_argument("code", False)
-        if not code:
+        authorization_code = handler.get_argument("code", False)
+        if not authorization_code:
             raise web.HTTPError(400, "oauth callback made without a token")
 
-        http_client = AsyncHTTPClient()
+        yield self.carina_client.request_tokens(authorization_code)
+        profile = yield self.carina_client.get_user_profile()
 
-        # Exchange the OAuth code for a Carina Access Token
-        #
-        # See: https://github.com/doorkeeper-gem/doorkeeper/wiki/API-endpoint-descriptions-and-examples#post---oauthtoken
-        post_data = {
-            'code': code,
-            'redirect_uri': self.oauth_callback_url,
-            'grant_type': "authorization_code"
-        }
-        req = HTTPRequest(url=CARINA_OAUTH_ACCESS_TOKEN_URL,
-                          method="POST",
-                          body=urllib.parse.urlencode(post_data),
-                          headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
-                          auth_username=self.client_id,
-                          auth_password=self.client_secret,
-                          auth_mode="basic"
-                          )
+        carina_username = profile['username']
 
-        resp = None
-        try:
-            resp = yield http_client.fetch(req)
-        except HTTPError as ex:
-            self.log.error(ex.response.body)
-            self.log.exception(ex)
-            raise
+        # map username to system username
+        system_username = self.username_map.get(carina_username, carina_username)
 
-        resp_json = json.loads(resp.body.decode('utf8', 'replace'))
+        # check system username against whitelist
+        if self.whitelist and system_username not in self.whitelist:
+            system_username = None
 
-        self.oauth_token = resp_json['access_token']
-
-        # Determine who the logged in user is
-        headers={"Accept": "application/json",
-                 "User-Agent": "JupyterHub",
-                 "Authorization": "Bearer {}".format(self.oauth_token)
-        }
-        req = HTTPRequest(url=CARINA_OAUTH_IDENTITY_URL,
-                          method="GET",
-                          headers=headers
-                          )
-        try:
-            resp = yield http_client.fetch(req)
-        except HTTPError as ex:
-            self.log.error(ex.response.body)
-            self.log.exception(ex)
-            raise
-        resp_json = json.loads(resp.body.decode('utf8', 'replace'))
-
-        carina_username = resp_json["username"]
-        #remap gihub username to system username
-        nix_username = self.username_map.get(carina_username, carina_username)
-
-        #check system username against whitelist
-        if self.whitelist and nix_username not in self.whitelist:
-            nix_username = None
-        return nix_username
+        return system_username

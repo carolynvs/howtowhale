@@ -1,24 +1,36 @@
 import docker
-from docker.errors import APIError
 from dockerspawner import DockerSpawner
-import json
 import os.path
-import pprint
 import re
-from io import StringIO
+import requests
 from tornado import gen
-from tornado.httpclient import HTTPRequest, HTTPError, AsyncHTTPClient
-from zipfile import ZipFile
-
-
-CARINA_OAUTH_HOST = os.environ.get('CARINA_OAUTH_HOST') or 'oauth.getcarina.com'
-CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
-
+from traitlets import Unicode, Integer
+from .CarinaOAuthClient import CarinaOAuthClient
 
 class CarinaSpawner(DockerSpawner):
 
-    cluster_name = "howtowhale"
-    cluster_polling_interval = 30
+    # Expose configuration
+    oauth_callback_url = Unicode(
+        os.getenv('OAUTH_CALLBACK_URL', ''),
+        config=True,
+        help="""Callback URL to use.
+        Typically `https://{host}/hub/oauth_callback`"""
+    )
+
+    client_id_env = 'OAUTH_CLIENT_ID'
+    client_id = Unicode(config=True)
+    def _client_id_default(self):
+        return os.getenv(self.client_id_env, '')
+
+    client_secret_env = 'OAUTH_CLIENT_SECRET'
+    client_secret = Unicode(config=True)
+    def _client_secret_default(self):
+        return os.getenv(self.client_secret_env, '')
+
+    cluster_name = Unicode(config=True, default_value='jupyterhub')
+
+    cluster_polling_interval = Integer(config=True, default_value=30)
+
     extra_host_config = {
         'volumes_from': ['swarm-data'],
         'port_bindings': {8888: None},
@@ -35,12 +47,14 @@ class CarinaSpawner(DockerSpawner):
         The Docker client used to connect to the user's Carina cluster
         """
 
-        # Use the same client for each Spawner instance
+        # Use the same Docker client for each Spawner instance
+        # TODO: Figure out how to configure this without overriding, or tweak a bit and call super
         if self._client is None:
             carina_dir = self.get_user_credentials_dir()
             docker_env = os.path.join(carina_dir, 'docker.env')
             if not os.path.exists(docker_env):
-                raise RuntimeError("ERROR! The credentials for {}/{} could not be found in {}.".format(self.user.name, self.cluster_name, carina_dir))
+                raise RuntimeError("ERROR! The credentials for {}/{} could not be found in {}.".format(
+                    self.user.name, self.cluster_name, carina_dir))
 
             tls_config = docker.tls.TLSConfig(
                 client_cert=(os.path.join(carina_dir, 'cert.pem'),
@@ -56,24 +70,36 @@ class CarinaSpawner(DockerSpawner):
 
         return self._client
 
-    _oauth_token = None
+    _carina_client = None
     @property
-    def oauth_token(self):
-        if self._oauth_token is None:
-            self._oauth_token = self.retrieve_oauth_token()
+    def carina_client(self):
+        if self._carina_client is None:
+            # If we just authenticated, use the existing client which has the credentials loaded
+            # Otherwise, make a new client and assume that load_state is about to be called next with the credentials
+            if self.authenticator and self.authenticator.carina_client:
+                self._carina_client = self.authenticator.carina_client
+            else:
+                self._carina_client = CarinaOAuthClient(self.client_id, self.client_secret, self.oauth_callback_url)
 
-        return self._oauth_token
+        return self._carina_client
 
     def get_state(self):
         state = super().get_state()
-        if self.oauth_token:
-            state["oauth_token"] = self.oauth_token
+        if self.carina_client.credentials:
+            state['access_token'] = self.carina_client.credentials.access_token
+            state['refresh_token'] = self.carina_client.credentials.refresh_token
+            state['expires_at'] = self.carina_client.credentials.expires_at
 
         return state
 
     def load_state(self, state):
         super().load_state(state)
-        self._oauth_token = state.get("oauth_token", None)
+
+        access_token = state.get('access_token', None)
+        refresh_token = state.get('refresh_token', None)
+        expires_at = state.get('expires_at', None)
+        if access_token:
+            self.carina_client.load_credentials(access_token, refresh_token, expires_at)
 
     def clear_state(self):
         super().clear_state()
@@ -83,6 +109,9 @@ class CarinaSpawner(DockerSpawner):
     @gen.coroutine
     def get_container(self):
         if not os.path.exists(self.get_user_credentials_dir()):
+            return None
+
+        if not self.cluster_exists():
             return None
 
         container = yield super().get_container()
@@ -95,6 +124,7 @@ class CarinaSpawner(DockerSpawner):
 
             yield self.create_cluster()
             yield self.download_cluster_credentials()
+            yield self.pull_user_image()
 
             self.log.info("Starting notebook container for {}...".format(self.user.name))
             extra_env = {
@@ -111,8 +141,7 @@ class CarinaSpawner(DockerSpawner):
 
             self.log.debug('Startup for {} is complete!'.format(self.user.name))
         except Exception as e:
-            self.log.error('Startup for {} failed!'.format(self.user.name))
-            self.log.exception(e)
+            self.log.exception('Startup for {} failed!'.format(self.user.name))
             raise
 
     @gen.coroutine
@@ -123,23 +152,7 @@ class CarinaSpawner(DockerSpawner):
         so it's safe to call without checking if it exists first.
         """
         self.log.info("Creating cluster named: {} for {}".format(self.cluster_name, self.user.name))
-
-        http_client = AsyncHTTPClient()
-        headers={"Accept": "application/json",
-                 "User-Agent": "JupyterHub",
-                 "Authorization": "Bearer {}".format(self.oauth_token)}
-        req = HTTPRequest(url=os.path.join(CARINA_CLUSTERS_URL, self.cluster_name),
-                          method="PUT",
-                          body="{}",
-                          headers=headers)
-
-
-        try:
-            yield http_client.fetch(req)
-        except HTTPError as ex:
-            self.log.error(ex.response.body)
-            self.log.exception(ex)
-            raise
+        yield self.carina_client.create_cluster(self.cluster_name)
 
     @gen.coroutine
     def download_cluster_credentials(self):
@@ -152,44 +165,29 @@ class CarinaSpawner(DockerSpawner):
         if os.path.exists(credentials_dir):
             return
 
-        self.log.info("Downloading {} cluster credentials for {}...".format(self.cluster_name, self.user.name))
+        self.log.info("Downloading cluster credentials for {}/{}...".format(self.user.name, self.cluster_name))
+        user_dir = "/root/.carina/clusters/{}".format(self.user.name)
+        yield self.carina_client.download_cluster_credentials(self.cluster_name, user_dir, self.cluster_polling_interval)
 
-        http_client = AsyncHTTPClient()
-        request = HTTPRequest(url=os.path.join(CARINA_CLUSTERS_URL, self.cluster_name),
-                          method="GET",
-                          headers={"Accept": "application/json",
-                                   "User-Agent": "JupyterHub",
-                                   "Authorization": "Bearer {}".format(self.oauth_token)})
+    @gen.coroutine
+    def cluster_exists(self):
+        try:
+            yield self.docker('info')
+            return True
+        except requests.exceptions.RequestException:
+            return False
 
-        while True:
-            # TODO: Abort after some set timeout, does jupyterhub handle that for us?
-            response = yield http_client.fetch(request, raise_error=False)
-
-            if response.error is None:
-                self.log.debug("Credentials for {}/{} received.".format(self.user.name, self.cluster_name))
-                break
-
-            if response.code == 404 and "cluster is not yet active" in response.body.decode(encoding='UTF-8'):
-                self.log.info("The {}/{} cluster is not yet active, retrying in {}s...".format(self.user.name, self.cluster_name, self.cluster_polling_interval))
-                yield gen.sleep(self.cluster_polling_interval)
-                continue
-
-            # abort, something bad happened!
-            self.log.error(response.response.body)
-            self.log.exception(response.error)
-            response.rethrow
-
-        credentials_zip = ZipFile(response.buffer, "r")
-        credentials_zip.extractall("/root/.carina/clusters/{}".format(self.user.name))
-        self.log.info("Credentials downloaded to /root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name))
+    @gen.coroutine
+    def pull_user_image(self):
+        """
+        Pull the user image to the cluster, so that it is ready to start instantly
+        """
+        self.log.debug("Starting to pull {} to the {}/{} cluster..."
+                       .format(self.container_image, self.user.name, self.cluster_name))
+        yield self.docker("pull", self.container_image)
+        self.log.debug("Finished pulling {} to the {}/{} cluster..."
+                       .format(self.container_image, self.user.name, self.cluster_name))
 
     def get_user_credentials_dir(self):
         credentials_dir = "/root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name)
         return credentials_dir
-
-    def retrieve_oauth_token(self):
-        self.log.info("===retrieve oauth token===")
-        if self.authenticator is None or not self.authenticator.oauth_token:
-            raise RuntimeError("Could not find the oauth token for {}".format(self.user.name))
-
-        return self.authenticator.oauth_token

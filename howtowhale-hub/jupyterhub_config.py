@@ -13,6 +13,7 @@ c.JupyterHub.confirm_no_ssl = True
 c.JupyterHub.hub_ip = "0.0.0.0"
 c.JupyterHub.spawner_class = "jupyterhub_carina.CarinaSpawner"
 c.CarinaSpawner.hub_ip_connect = domain
+c.CarinaSpawner.cluster_name = "howtowhale"
 c.CarinaSpawner.container_prefix = "howtowhale"
 c.CarinaSpawner.container_image = "carolynvs/howtowhale-user:{}".format(version)
 c.CarinaSpawner.start_timeout = 300
@@ -29,5 +30,3 @@ c.Spawner.args = ['--debug', '--NotebookApp.default_url=/notebooks/TryDocker.ipy
 c.Authenticator.admin_users = ["carolynvs"]
 c.JupyterHub.authenticator_class = "jupyterhub_carina.CarinaAuthenticator"
 c.CarinaAuthenticator.oauth_callback_url = "https://{}/jupyter/hub/oauth_callback".format(domain)
-c.CarinaAuthenticator.client_id = os.environ["CARINA_CLIENT_ID"]
-c.CarinaAuthenticator.client_secret = os.environ["CARINA_CLIENT_SECRET"]
