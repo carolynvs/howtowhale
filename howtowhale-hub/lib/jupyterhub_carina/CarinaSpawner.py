@@ -1,8 +1,8 @@
 import docker
-from docker.errors import APIError
 from dockerspawner import DockerSpawner
 import os.path
 import re
+import requests
 from tornado import gen
 from traitlets import Unicode, Integer
 from .CarinaOAuthClient import CarinaOAuthClient
@@ -173,7 +173,7 @@ class CarinaSpawner(DockerSpawner):
         try:
             yield self.docker('info')
             return True
-        except APIError:
+        except requests.exceptions.RequestException:
             return False
 
     def get_user_credentials_dir(self):
