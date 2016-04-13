@@ -1,9 +1,9 @@
 import json
-import logging
 import os
 from time import time
 from tornado import gen
 from tornado.httpclient import HTTPRequest, HTTPError, AsyncHTTPClient
+from traitlets.config import LoggingConfigurable
 import urllib
 from zipfile import ZipFile
 
@@ -14,7 +14,7 @@ class CarinaOAuthCredentials:
         self.expires_at = expires_at
 
 
-class CarinaOAuthClient:
+class CarinaOAuthClient(LoggingConfigurable):
     CARINA_OAUTH_HOST = os.environ.get('CARINA_OAUTH_HOST') or 'oauth.getcarina.com'
     CARINA_AUTHORIZE_URL = "https://%s/oauth/authorize" % CARINA_OAUTH_HOST
     CARINA_TOKEN_URL = "https://%s/oauth/token" % CARINA_OAUTH_HOST
@@ -22,7 +22,7 @@ class CarinaOAuthClient:
     CARINA_CLUSTERS_URL = "https://%s/clusters" % CARINA_OAUTH_HOST
 
     def __init__(self, client_id, client_secret, callback_url):
-        self.log = logging.getLogger('jupyterhub_carina.CarinaOAuthClient')
+        super().__init__()
         self.client_id = client_id
         self.client_secret = client_secret
         self.callback_url = callback_url
