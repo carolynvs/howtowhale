@@ -124,6 +124,7 @@ class CarinaSpawner(DockerSpawner):
 
             yield self.create_cluster()
             yield self.download_cluster_credentials()
+            yield self.pull_user_image()
 
             self.log.info("Starting notebook container for {}...".format(self.user.name))
             extra_env = {
@@ -175,6 +176,17 @@ class CarinaSpawner(DockerSpawner):
             return True
         except requests.exceptions.RequestException:
             return False
+
+    @gen.coroutine
+    def pull_user_image(self):
+        """
+        Pull the user image to the cluster, so that it is ready to start instantly
+        """
+        self.log.debug("Starting to pull {} to the {}/{} cluster..."
+                       .format(self.container_image, self.user.name, self.cluster_name))
+        yield self.docker("pull", self.container_image)
+        self.log.debug("Finished pulling {} to the {}/{} cluster..."
+                       .format(self.container_image, self.user.name, self.cluster_name))
 
     def get_user_credentials_dir(self):
         credentials_dir = "/root/.carina/clusters/{}/{}".format(self.user.name, self.cluster_name)
