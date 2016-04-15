@@ -41,14 +41,19 @@ class CarinaSpawner(DockerSpawner):
         }
     }
 
-    _client = None
+    def __init__(self, **kwargs):
+        # Use a different docker client for each server
+        self._client = None
+        self._carina_client = None
+        
+        super().__init__(**kwargs)
+
     @property
     def client(self):
         """
         The Docker client used to connect to the user's Carina cluster
         """
 
-        # Use the same Docker client for each Spawner instance
         # TODO: Figure out how to configure this without overriding, or tweak a bit and call super
         if self._client is None:
             carina_dir = self.get_user_credentials_dir()
@@ -71,21 +76,23 @@ class CarinaSpawner(DockerSpawner):
 
         return self._client
 
-    _carina_client = None
     @property
     def carina_client(self):
         if self._carina_client is None:
             # If we just authenticated, use the existing client which has the credentials loaded
             # Otherwise, make a new client and assume that load_state is about to be called next with the credentials
-            if self.authenticator and self.authenticator.carina_client:
+            if self.authenticator and self.authenticator.carina_client.credentials:
+                self.log.debug("Using the Carina client for %s from the CarinaAuthenticator", self.user.name)
                 self._carina_client = self.authenticator.carina_client
                 self._carina_client.user = self.user.name
             else:
+                self.log.debug("Initializing a carina client for %s", self.user.name)
                 self._carina_client = CarinaOAuthClient(self.client_id, self.client_secret, self.oauth_callback_url, user=self.user.name)
 
         return self._carina_client
 
     def get_state(self):
+        self.log.debug("Saving state for %s", self.user.name)
         state = super().get_state()
         if self.carina_client.credentials:
             state['access_token'] = self.carina_client.credentials.access_token
@@ -95,16 +102,20 @@ class CarinaSpawner(DockerSpawner):
         return state
 
     def load_state(self, state):
+        self.log.debug("Loading state for %s", self.user.name)
         super().load_state(state)
 
         access_token = state.get('access_token', None)
         refresh_token = state.get('refresh_token', None)
         expires_at = state.get('expires_at', None)
         if access_token:
+            self.log.debug("Loading users's oauth credentials")
             self.carina_client.load_credentials(access_token, refresh_token, expires_at)
 
     def clear_state(self):
+        self.log.debug("Clearing state")
         super().clear_state()
+
         # TODO: Move this to DockerSpawner
         self.container_id = ''
 
