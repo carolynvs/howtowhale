@@ -24,6 +24,7 @@ c.JupyterHub.admin_access = True
 c.Spawner.debug = True
 c.DockerSpawner.debug = True
 c.CarinaSpawner.debug = True
+c.CarinaOAuthClient.debug = True
 c.Spawner.args = ['--debug', '--NotebookApp.default_url=/notebooks/TryDocker.ipynb']
 
 # Configure oauth

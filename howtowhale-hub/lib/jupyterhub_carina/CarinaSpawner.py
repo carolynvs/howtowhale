@@ -7,6 +7,7 @@ from tornado import gen
 from traitlets import Unicode, Integer
 from .CarinaOAuthClient import CarinaOAuthClient
 
+
 class CarinaSpawner(DockerSpawner):
 
     # Expose configuration
@@ -78,8 +79,9 @@ class CarinaSpawner(DockerSpawner):
             # Otherwise, make a new client and assume that load_state is about to be called next with the credentials
             if self.authenticator and self.authenticator.carina_client:
                 self._carina_client = self.authenticator.carina_client
+                self._carina_client.user = self.user.name
             else:
-                self._carina_client = CarinaOAuthClient(self.client_id, self.client_secret, self.oauth_callback_url)
+                self._carina_client = CarinaOAuthClient(self.client_id, self.client_secret, self.oauth_callback_url, user=self.user.name)
 
         return self._carina_client
 
