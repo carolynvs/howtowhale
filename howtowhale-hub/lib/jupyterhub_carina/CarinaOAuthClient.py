@@ -13,6 +13,8 @@ class CarinaOAuthCredentials:
         self.refresh_token = refresh_token
         self.expires_at = expires_at
 
+    def is_expired(self):
+        return time() >= (self.expires_at + 60)
 
 class CarinaOAuthClient(LoggingConfigurable):
     CARINA_OAUTH_HOST = os.environ.get('CARINA_OAUTH_HOST') or 'oauth.getcarina.com'
@@ -38,7 +40,6 @@ class CarinaOAuthClient(LoggingConfigurable):
 
         See: https://github.com/doorkeeper-gem/doorkeeper/wiki/API-endpoint-descriptions-and-examples#post---oauthtoken
         """
-        http_client = AsyncHTTPClient()
         request = HTTPRequest(
             url=self.CARINA_TOKEN_URL,
             method='POST',
@@ -56,15 +57,9 @@ class CarinaOAuthClient(LoggingConfigurable):
             auth_mode='basic')
 
         request_timestamp = time()
-        try:
-            response = yield http_client.fetch(request)
-        except HTTPError as e:
-            self.log.exception('An error occurred while requesting an access token:\n(%s) %s',
-                               e.response.code, e.response.body)
-            raise
+        response = yield self.execute_request(request)
 
         result = json.loads(response.body.decode('utf8', 'replace'))
-
         self.credentials = CarinaOAuthCredentials(
             access_token=result['access_token'],
             refresh_token=result['refresh_token'],
@@ -76,22 +71,13 @@ class CarinaOAuthClient(LoggingConfigurable):
         Determine who the logged in user is
         """
 
-        http_client = AsyncHTTPClient()
         request = HTTPRequest(
             url=self.CARINA_PROFILE_URL,
             method='GET',
             headers={
                 'Accept': 'application/json',
-                'User-Agent': 'jupyterhub',
-                'Authorization': 'bearer {}'.format(self.credentials.access_token)
             })
-        try:
-            response = yield http_client.fetch(request)
-        except HTTPError as e:
-            self.log.exception('An error occurred while retrieving a user profile:\n(%s) %s',
-                               e.response.code, e.response.body)
-            raise
-
+        response = yield self.execute_oauth_request(request)
         result = json.loads(response.body.decode('utf8', 'replace'))
         return result
 
@@ -101,23 +87,15 @@ class CarinaOAuthClient(LoggingConfigurable):
         Create a Carina cluster
         """
 
-        http_client = AsyncHTTPClient()
         request = HTTPRequest(
             url=os.path.join(self.CARINA_CLUSTERS_URL, cluster_name),
             method='PUT',
             body='{}',
             headers={
-                'Accept': 'application/json',
-                'User-Agent': 'jupyterhub',
-                'Authorization': 'bearer {}'.format(self.credentials.access_token)
+                'Accept': 'application/json'
             })
 
-        try:
-            response = yield http_client.fetch(request)
-        except HTTPError as e:
-            self.log.exception('An error occurred while creating a cluster:\n(%s) %s', e.response.code, e.response.body)
-            raise
-
+        response = yield self.execute_oauth_request(request)
         result = json.loads(response.body.decode('utf8', 'replace'))
         return result
 
@@ -126,18 +104,15 @@ class CarinaOAuthClient(LoggingConfigurable):
         """
         Download a cluster's credentials to the specified location.
         """
-        http_client = AsyncHTTPClient()
         request = HTTPRequest(
             url=os.path.join(self.CARINA_CLUSTERS_URL, cluster_name),
             method='GET',
             headers={
-                'Accept': 'application/zip',
-                'User-Agent': 'jupyterhub',
-                'Authorization': 'bearer {}'.format(self.credentials.access_token)
+                'Accept': 'application/zip'
             })
 
         while True:
-            response = yield http_client.fetch(request, raise_error=False)
+            response = yield self.execute_oauth_request(request, raise_error=False)
 
             if response.error is None:
                 self.log.debug("Credentials for {} received.".format(cluster_name))
@@ -157,3 +132,23 @@ class CarinaOAuthClient(LoggingConfigurable):
         credentials_zip = ZipFile(response.buffer, "r")
         credentials_zip.extractall(destination)
         self.log.info("Credentials downloaded to {}".format(destination))
+
+    @gen.coroutine
+    def execute_oauth_request(self, request, raise_error=True):
+        request.headers.update({
+                'Authorization': 'bearer {}'.format(self.credentials.access_token)
+            })
+        return (yield self.execute_request(request, raise_error))
+
+    @gen.coroutine
+    def execute_request(self, request, raise_error=True):
+        http_client = AsyncHTTPClient()
+        request.headers.update({
+                'User-Agent': 'jupyterhub'
+            })
+        try:
+            return (yield http_client.fetch(request, raise_error=raise_error))
+        except HTTPError as e:
+            self.log.exception('An error occurred executing %s %s:\n(%s) %s',
+                               request.method, request.url, e.response.code, e.response.body)
+            raise
