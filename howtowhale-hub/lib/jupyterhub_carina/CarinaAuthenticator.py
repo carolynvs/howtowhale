@@ -10,8 +10,10 @@ class CarinaMixin(OAuth2Mixin):
     _OAUTH_AUTHORIZE_URL = CarinaOAuthClient.CARINA_AUTHORIZE_URL
     _OAUTH_ACCESS_TOKEN_URL = CarinaOAuthClient.CARINA_TOKEN_URL
 
+
 class CarinaLoginHandler(OAuthLoginHandler, CarinaMixin):
     scope = ['identity', 'cluster_credentials', 'create_cluster']
+
 
 class CarinaAuthenticator(OAuthenticator, LoggingConfigurable):
     # Configure the base OAuthenticator
