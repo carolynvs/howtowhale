@@ -10,7 +10,7 @@ With the help of [Carina](https://getcarina.com/), a Docker Swarm cluster is cre
 
 ## Troubleshooting
 
-This is still a prototype, so there is no expecation stability! If you run into errors, your best bet is to [go to the control panel][control-panel], stop your server, logout, then log back in.
+This is still a prototype, so there is no expectation stability! If you run into errors, your best bet is to [go to the control panel][control-panel], stop your server, logout, then log back in.
 
 Author: Carolyn Van Slyck, http://carolynvanslyck.com/
 
