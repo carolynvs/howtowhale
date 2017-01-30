@@ -1,11 +1,18 @@
 #!/bin/sh
 set -e
 
-#carina create --wait howtowhale-prod
-#carina credentials howtowhale-prod
-eval $(carina env howtowhale-prod)
+source secrets
 
-#stop, get the ip address for the cluster and update DNS
+if ! carina get howtowhale-prod; then
+  carina create --wait --template "Swarm 1.11.2 on LXC" howtowhale-prod
+fi
+carina credentials howtowhale-prod
+eval $(carina env howtowhale-prod)
+dvm use
+
+echo "Add an A record to your DNS now pointing to the IP address below:"
+docker run --rm --net=host -e constraint:node==*master* racknet/ip public ipv4
+read -p "Press ENTER to continue"
 
 docker run \
   --name letsencrypt-data \
