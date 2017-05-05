@@ -1,0 +1,44 @@
+body:after {
+  content: "beta";
+  position: fixed;
+  width: 80px;
+  height: 25px;
+  background: red;
+  top: 7px;
+  left: -20px;
+  text-align: center;
+  font-size: 13px;
+  font-family: sans-serif;
+  text-transform: uppercase;
+  font-weight: bold;
+  color: #fff;
+  line-height: 27px;
+  -ms-transform:rotate(-45deg);
+  -webkit-transform:rotate(-45deg);
+  transform:rotate(-45deg);
+}
+
+.jumbotron {
+  background-color: #e1eaef;
+}
+
+img.emoji {
+  width: 32px;
+}
+
+a img {
+  margin-right: 0.5em;
+}
+
+.navbar {
+  border-radius: 0;
+}
+
+#logo {
+  margin-top: -10px;
+}
+
+.platform {
+  display: table;
+  margin: 5em auto;
+}
